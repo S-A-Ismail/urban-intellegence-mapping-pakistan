@@ -1,0 +1,14 @@
+# download cache for rebuild_boundaries.py
+_cache/
+
+# local census overrides
+census.json
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# excel lock files
+~$*.xlsx

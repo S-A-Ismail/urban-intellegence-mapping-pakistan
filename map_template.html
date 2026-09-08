@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Pakistan Urban Intelligence Map</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+ --bg:#0b0f14; --panel:#111820; --panel2:#161f2a; --line:#1e2b38;
+ --ink:#e6edf3; --dim:#8b9bab; --faint:#5b6b7b;
+ --acc:#4ea1ff; --gold:#e0a83c; --warn:#e2683c; --ok:#3fb98a;
+ --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+html,body{height:100%;background:var(--bg);color:var(--ink);
+ font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+ -webkit-font-smoothing:antialiased;overflow:hidden}
+#app{display:grid;grid-template-columns:242px 1fr 318px;height:100vh}
+@media(max-width:1180px){#app{grid-template-columns:1fr}
+ #left,#right{position:absolute;z-index:20;height:auto;max-height:44vh;width:264px;top:8px}
+ #left{left:8px} #right{right:8px}}
+
+.pane{background:var(--panel);border-right:1px solid var(--line);overflow-y:auto}
+#right{border-right:none;border-left:1px solid var(--line)}
+.pane::-webkit-scrollbar{width:6px}
+.pane::-webkit-scrollbar-thumb{background:#243244;border-radius:3px}
+
+.brand{padding:15px 15px 12px;border-bottom:1px solid var(--line)}
+.brand h1{font-size:12.5px;font-weight:650;letter-spacing:.24px;line-height:1.35}
+.brand .s{font-size:9.5px;color:var(--faint);margin-top:4px;letter-spacing:.5px;text-transform:uppercase}
+
+.grp{padding:12px 15px;border-bottom:1px solid var(--line)}
+.grp h2{font-size:9px;letter-spacing:1.1px;text-transform:uppercase;color:var(--faint);margin-bottom:8px;font-weight:600}
+.opt{display:block;width:100%;text-align:left;background:transparent;border:1px solid transparent;
+ color:var(--dim);font:inherit;font-size:11.5px;padding:6px 9px;border-radius:5px;cursor:pointer;
+ transition:.13s;margin-bottom:2px}
+.opt:hover{background:var(--panel2);color:var(--ink)}
+.opt.on{background:rgba(78,161,255,.13);color:var(--acc);border-color:rgba(78,161,255,.3);font-weight:550}
+.opt.off{opacity:.34;cursor:not-allowed}
+.opt .tag{float:right;font-size:8.5px;color:var(--faint);letter-spacing:.3px;padding-top:1px}
+.opt.sep{opacity:1;color:var(--faint);font-size:8.5px;letter-spacing:1px;cursor:default;
+ padding:9px 9px 3px;border-top:1px solid var(--line);margin-top:6px;font-weight:600}
+
+.seg{display:flex;gap:4px}
+.seg button{flex:1;background:var(--panel2);border:1px solid var(--line);color:var(--dim);
+ font:inherit;font-size:11px;padding:6px 4px;border-radius:5px;cursor:pointer;transition:.13s}
+.seg button:hover{color:var(--ink)}
+.seg button.on{background:rgba(78,161,255,.14);color:var(--acc);border-color:rgba(78,161,255,.34);font-weight:600}
+.seg button .y{display:block;font-size:8.5px;letter-spacing:.4px;color:var(--faint);margin-top:1px}
+.seg button.on .y{color:var(--acc);opacity:.8}
+
+#stage{position:relative;background:
+ radial-gradient(1100px 620px at 52% 32%,#101a25 0%,var(--bg) 72%)}
+svg{width:100%;height:100%;display:block;cursor:grab}
+svg:active{cursor:grabbing}
+
+#crumb{position:absolute;top:13px;left:16px;display:flex;gap:5px;align-items:center;
+ background:rgba(11,15,20,.84);backdrop-filter:blur(9px);border:1px solid var(--line);
+ padding:6px 11px;border-radius:7px;font-size:11px;z-index:9;max-width:70%;flex-wrap:wrap}
+#crumb button{background:none;border:none;color:var(--acc);font:inherit;font-size:11px;cursor:pointer;padding:0}
+#crumb button:hover{text-decoration:underline}
+#crumb .sep{color:var(--faint)} #crumb .cur{color:var(--ink);font-weight:550}
+
+#yearflag{position:absolute;top:13px;right:16px;z-index:9;font-size:10px;
+ background:rgba(11,15,20,.84);backdrop-filter:blur(9px);border:1px solid var(--line);
+ padding:6px 10px;border-radius:7px;color:var(--dim)}
+#yearflag b{color:var(--ink)}
+
+#legend{position:absolute;left:16px;bottom:16px;background:rgba(11,15,20,.9);
+ backdrop-filter:blur(9px);border:1px solid var(--line);padding:10px 12px;border-radius:7px;
+ min-width:206px;z-index:9}
+#legend .lt{font-size:9px;letter-spacing:.9px;text-transform:uppercase;color:var(--faint);margin-bottom:7px;font-weight:600}
+#ramp{height:9px;border-radius:2px;margin-bottom:5px}
+#lscale{display:flex;justify-content:space-between;font:11px var(--mono);color:var(--dim)}
+#lnote{font-size:9.5px;color:var(--faint);margin-top:6px;line-height:1.4;max-width:216px}
+
+#tip{position:fixed;pointer-events:none;z-index:60;opacity:0;transition:opacity .1s;
+ background:rgba(13,19,26,.97);border:1px solid #2a3a4c;border-radius:8px;padding:10px 12px;
+ min-width:200px;max-width:292px;box-shadow:0 12px 34px rgba(0,0,0,.6)}
+#tip .n{font-size:13px;font-weight:600;margin-bottom:1px}
+#tip .l{font-size:9px;letter-spacing:.7px;text-transform:uppercase;color:var(--faint);margin-bottom:8px}
+#tip .r{display:flex;justify-content:space-between;gap:14px;font-size:11.5px;padding:2.5px 0}
+#tip .r span:first-child{color:var(--dim)}
+#tip .r span:last-child{font-family:var(--mono);font-weight:550}
+#tip .src{font-size:9px;color:var(--faint);margin-top:8px;padding-top:7px;border-top:1px solid #223040;line-height:1.45}
+
+.card{padding:13px 15px;border-bottom:1px solid var(--line)}
+.card h3{font-size:9px;letter-spacing:1.1px;text-transform:uppercase;color:var(--faint);margin-bottom:9px;font-weight:600}
+.kv{display:flex;justify-content:space-between;gap:10px;font-size:11.5px;padding:3.5px 0}
+.kv span:first-child{color:var(--dim)}
+.kv span:last-child{font-family:var(--mono);font-weight:550}
+.kv.neg span:last-child{color:var(--warn)}
+.big{font-size:25px;font-weight:640;font-family:var(--mono);letter-spacing:-.6px}
+.sm{font-size:10px;color:var(--faint);margin-top:2px}
+.pill{display:inline-block;font-size:8.5px;letter-spacing:.5px;text-transform:uppercase;
+ padding:2px 6px;border-radius:3px;font-weight:600}
+.p-off{background:rgba(63,185,138,.15);color:var(--ok)}
+.p-open{background:rgba(78,161,255,.15);color:var(--acc)}
+.p-der{background:rgba(224,168,60,.15);color:var(--gold)}
+.p-no{background:rgba(226,104,60,.15);color:var(--warn)}
+table{width:100%;border-collapse:collapse;font-size:11px}
+th{text-align:left;font-size:8.5px;letter-spacing:.6px;text-transform:uppercase;color:var(--faint);
+ padding:4px 3px;border-bottom:1px solid var(--line);font-weight:600}
+td{padding:4px 3px;border-bottom:1px solid rgba(30,43,56,.5);font-family:var(--mono);font-size:10.5px}
+td:first-child{font-family:inherit;color:var(--dim)}
+tr.pick{cursor:pointer} tr.pick:hover td{background:var(--panel2)}
+tr.on td{background:rgba(78,161,255,.1)}
+.warnbox{background:rgba(226,104,60,.08);border:1px solid rgba(226,104,60,.25);
+ border-radius:6px;padding:9px 10px;font-size:10px;line-height:1.5;color:#f0b39c}
+.warnbox b{color:var(--warn)}
+.infobox{background:rgba(78,161,255,.07);border:1px solid rgba(78,161,255,.22);
+ border-radius:6px;padding:9px 10px;font-size:10px;line-height:1.5;color:#a8c8ea}
+.hint{font-size:10px;color:var(--faint);line-height:1.5}
+.bar{height:5px;background:#1b2634;border-radius:3px;overflow:hidden;margin-top:3px}
+.bar i{display:block;height:100%;background:var(--acc)}
+</style></head><body>
+<div id="app">
+ <div class="pane" id="left">
+  <div class="brand"><h1>PAKISTAN URBAN<br/>INTELLIGENCE MAP</h1>
+   <div class="s" id="brandsub">Census 2023 · five cities</div></div>
+  <div class="grp"><h2>City</h2><div id="c-city"></div></div>
+  <div class="grp"><h2>Geographic level</h2><div id="c-level"></div></div>
+  <div class="grp"><h2>Year</h2><div class="seg" id="c-year"></div>
+   <div class="hint" id="yearhint" style="margin-top:7px"></div></div>
+  <div class="grp"><h2>Data layer</h2><div id="c-layer"></div></div>
+ </div>
+ <div id="stage">
+  <div id="crumb"></div><div id="yearflag"></div><svg id="map"></svg>
+  <div id="legend"><div class="lt" id="ltitle">Population</div>
+   <div id="ramp"></div><div id="lscale"><span></span><span></span></div>
+   <div id="lnote"></div></div>
+ </div>
+ <div class="pane" id="right"></div>
+</div>
+<div id="tip"></div>
+<script>
+const GEO=__GEO__, D=__DATA__;
+const M=D.meta||{};
+
+/* ================= units =========================================
+   Standard units for everything measurable — plain grouped integers for
+   counts, km2 for area, /km2 for density, % for rates. Money is the one
+   exception: PKR in Lakh and Crore, which is how these figures get quoted. */
+const cnt=v=>(v==null||isNaN(v))?"—":Math.round(v).toLocaleString("en-US");
+function money(v){
+  if(v==null||isNaN(v)) return "—";
+  const a=Math.abs(v), s=v<0?"−":"";
+  if(a>=1e7) return s+"Rs "+(a/1e7).toFixed(2)+" Cr";
+  if(a>=1e5) return s+"Rs "+(a/1e5).toFixed(2)+" L";
+  return s+"Rs "+Math.round(a).toLocaleString("en-US");
+}
+const km2  =v=>(v==null||isNaN(v))?"—":cnt(v)+" km²";
+const dens =v=>(v==null||isNaN(v))?"—":cnt(v)+" /km²";
+const rate =v=>(v==null||isNaN(v))?"—":(v*100).toFixed(2)+"%/yr";
+const pc   =v=>(v==null||isNaN(v))?"—":(v*100).toFixed(1)+"%";
+const mons =v=>(v==null||isNaN(v))?"—":v.toFixed(1)+" mo";
+const YRS=["2023","2026"];
+
+/* ================= records =======================================
+   One resolver for all five cities. Census figures come straight from the
+   workbook; anything computed is marked derived in the layer definition. */
+function resolve(r,year){
+  if(!r) return null;
+  const m=Object.assign({},r);
+  m.pop = r.pop ? r.pop[year] : r.pop23;
+  m.hh  = r.hh  ? r.hh[year]  : null;
+  const a=r.area||r.area_net;
+  m.density = (m.pop!=null&&a)? m.pop/a : null;
+  m.cagr = r.growth_raw!=null? r.growth_raw : null;
+  if(year==="2023"){
+    m.newpop = (r.pop23!=null&&r.pop17!=null)? r.pop23-r.pop17 : null;
+    m.newhh  = (r.pop23!=null&&r.pop17!=null&&r.hh_size)
+                ? (r.pop23-r.pop17)/r.hh_size : null;
+    m.span="2017→2023 census";
+  }else{
+    m.newpop = (r.pop&&r.pop["2026"]!=null)? r.pop["2026"]-r.pop["2023"] : null;
+    m.newhh  = (r.hh &&r.hh ["2026"]!=null)? r.hh ["2026"]-r.hh ["2023"] : null;
+    m.span="2023→2026 projected";
+  }
+  m.newhh_km = (m.newhh!=null&&a)? m.newhh/a : null;
+  m.area = a;
+  return m;
+}
+const REG=D.regions||{}, HYP=D.hyper||{}, CIT=D.cities||{};
+const CITY_LIST=Object.keys(D.city_pt||{});
+function cityRec(city,year){
+  const c=CIT[city]; if(!c) return null;
+  const rs=Object.entries(REG).filter(([,v])=>v.city===city);
+  const area=rs.reduce((s,[,v])=>s+(v.area||0),0);
+  const sum=k=>rs.reduce((s,[,v])=>s+(v[k]||0),0)
+              +Object.values(HYP).filter(h=>h.city===city).reduce((s,h)=>s+(h[k]||0),0);
+  const m={city:city,kind:"city",area:area,
+    pop:c.pop[year], hh:c.hh[year],
+    density: area? c.pop[year]/area : null,
+    newpop: year==="2023"? null : c.pop["2026"]-c.pop["2023"],
+    newhh:  year==="2023"? null : c.hh ["2026"]-c.hh ["2023"],
+    span: year==="2023"? "census 2023" : "2023→2026 projected",
+    units:sum("units"), feeA:sum("feeA"), spp:sum("spp"), quota:sum("quota"),
+    topline:sum("topline"), bottom:sum("bottom"), territories:rs.length};
+  m.newhh_km = (m.newhh!=null&&area)? m.newhh/area : null;
+  m.cagr = Math.pow(c.pop["2030"]/c.pop["2023"],1/7)-1;
+  return m;
+}
+
+/* ================= layers ======================================== */
+const LAYERS={
+ population:{label:"Population",acc:m=>m&&m.pop,fmt:cnt,
+   note:y=>y==="2023"?"Total residents, 2023 census.":
+            "Projected residents 2026, census growth compounded and capped at "
+            +pc(M.growth_cap)+".",
+   prov:y=>y==="2023"?"official":"derived"},
+ density:{label:"Population density",acc:m=>m&&m.density,fmt:dens,
+   note:y=>"Population ÷ census area."+(y==="2023"?" Both census figures.":" Projected population."),
+   prov:y=>y==="2023"?"official":"derived"},
+ growth:{label:"Population growth",acc:m=>m&&m.cagr,fmt:rate,
+   note:()=>"Compound annual growth, 2017→2023 censuses. Unaffected by the year "
+            +"toggle. The model caps this at "+pc(M.growth_cap)+" and floors it at zero.",
+   prov:()=>"official"},
+ households:{label:"Households",acc:m=>m&&m.hh,fmt:cnt,
+   note:y=>"Population ÷ census household size"+(y==="2023"?".":", projected to 2026."),
+   prov:()=>"derived"},
+ newhousing:{label:"New housing (net new households)",acc:m=>m&&m.newhh,fmt:cnt,
+   note:()=>"Households added over the window. A proxy for residential absorption "
+            +"— not a count of projects or units.",
+   prov:()=>"derived"},
+ newhousing_d:{label:"New housing intensity",acc:m=>m&&m.newhh_km,fmt:dens,
+   note:()=>"Net new households per km². Shows where absorption concentrates.",
+   prov:()=>"derived"},
+ price:{label:"Average housing price",acc:()=>null,fmt:()=>"—",disabled:true,
+   note:()=>"No open, attributable dataset at this geography. Slot reserved.",prov:()=>"none"},
+ pricegrowth:{label:"Housing price growth",acc:()=>null,fmt:()=>"—",disabled:true,
+   note:()=>"No open, attributable dataset. Slot reserved.",prov:()=>"none"},
+ projects:{label:"New housing projects",acc:()=>null,fmt:()=>"—",disabled:true,
+   note:()=>"Requires a licensed listings/approvals feed. Slot reserved.",prov:()=>"none"},
+ _sep:{label:"— DEALERSHIP MODEL —",sep:true,disabled:true,acc:()=>null,fmt:()=>"",
+   note:()=>"",prov:()=>"derived"},
+ units:{label:"Fee Units",acc:m=>m&&m.units,fmt:v=>v==null?"—":v.toFixed(2),
+   note:()=>"Score out of 100 across all 29 territories: 45% new-build + 35% "
+            +"replacement + 15% installed base + 5% area.",prov:()=>"derived"},
+ fee:{label:"Entry fee",acc:m=>m&&m.feeA,fmt:money,
+   note:()=>"Dealership entry fee at the chosen anchor — "+(M.anchor_on||"?")
+            +" at "+money(M.anchor_fee)+", giving "+money(M.rate)
+            +" per Fee Unit. Matches the workbook exactly.",prov:()=>"derived"},
+ spp:{label:"Serviceable pump points",acc:m=>m&&m.spp,fmt:cnt,
+   note:()=>"Houses × "+(M.pumps_per_house||1.2)+" + flats ÷ "+(M.flats_per_set||40)
+            +". The unit the dealership model prices on.",prov:()=>"derived"},
+ quota:{label:"Quarterly quota (pumps)",acc:m=>m&&m.quota,fmt:cnt,
+   note:()=>"Addressable pump points × tier market share, per quarter.",prov:()=>"derived"},
+ topline:{label:"Top line — sales / yr",acc:m=>m&&m.topline,fmt:money,
+   note:()=>"Quota × "+money(M.pump_price)+" average pump price. Before any costs.",
+   prov:()=>"derived"},
+ bottom:{label:"Bottom line — profit / yr",acc:m=>m&&m.bottom,fmt:money,
+   note:()=>"Gross profit at "+pc(M.margin)+" margin, less the amortised licence fee.",
+   prov:()=>"derived"},
+ payback:{label:"Payback (months)",acc:m=>m&&m.payback,fmt:mons,
+   note:()=>"Net cash outlay ÷ monthly gross profit. Lower is faster.",prov:()=>"derived"},
+};
+const PROV={official:["p-off","Official"],open:["p-open","Open GIS"],
+            derived:["p-der","Derived"],none:["p-no","No data"]};
+
+/* ================= levels ========================================
+   Each city drills as far as real geometry allows, and no further. */
+const LEVELS={
+ Pakistan:[
+  {id:"cities",   label:"Cities (5)",       geo:"cities",             join:"city"},
+  {id:"provinces",label:"Provinces (8)",    geo:"provinces",          join:null}],
+ Karachi:[
+  {id:"district", label:"Districts (7)",    geo:"karachi_districts",  join:"region"},
+  {id:"town",     label:"Towns (18)",       geo:"karachi_towns",      join:null},
+  {id:"area",     label:"Neighbourhoods",   geo:"city_areas",         join:"enclave"}],
+ Lahore:[
+  {id:"tehsil",   label:"Tehsils (10)",     geo:"lahore_tehsils",     join:"region"},
+  {id:"locality", label:"Localities (801)", geo:"lahore_localities",  join:null},
+  {id:"area",     label:"Neighbourhoods",   geo:"city_areas",         join:"enclave"}],
+ Islamabad:[
+  {id:"district", label:"ICT (whole)",      geo:"islamabad_district", join:"city"},
+  {id:"area",     label:"Neighbourhoods",   geo:"city_areas",         join:"enclave"}],
+ Peshawar:[
+  {id:"territory",label:"Territories (4)",  geo:"peshawar_groups",    join:"region"},
+  {id:"tehsil",   label:"Tehsils (7)",      geo:"peshawar_tehsils",   join:null},
+  {id:"area",     label:"Neighbourhoods",   geo:"city_areas",         join:"enclave"}],
+ Multan:[
+  {id:"tehsil",   label:"Tehsils (4)",      geo:"multan_tehsils",     join:"region"}],
+};
+const LVKIND={crosswalk:"crosswalked from an older layer",
+  source:"drawn by a different open source",match:"names and geometry correspond",
+  vintage:"a different administrative vintage"};
+
+/* ================= state =========================================
+   `focus` is the territory the view is zoomed into. Selecting Karachi South and
+   dropping to neighbourhoods keeps it as the focus, so the map enlarges that
+   district instead of showing all 454 areas at city scale. */
+let S={city:"Pakistan",level:"cities",layer:"population",year:"2026",
+       sel:null,focus:null};
+function focusFeature(){
+  if(!S.focus) return null;
+  for(const l of levels()){
+    const fc=GEO[l.geo]; if(!fc) continue;
+    const f=fc.features.find(x=>x.properties.name===S.focus);
+    if(f) return f;
+  }
+  return null;
+}
+
+function levels(){return LEVELS[S.city]||LEVELS.Pakistan}
+function lvl(){return levels().find(l=>l.id===S.level)||levels()[0]}
+
+function features(){
+  const L=lvl(), fc=GEO[L.geo];
+  if(!fc) return [];
+  let fs=fc.features;
+  if(L.geo==="city_areas") fs=fs.filter(f=>f.properties.city===S.city);
+  if(L.geo==="provinces") return fs;
+  return fs;
+}
+/* the data record behind a drawn feature, or null when the shape carries no
+   statistics of its own — which is deliberate and shown as such */
+function datum(f){
+  const L=lvl(), p=f.properties, n=p.name;
+  if(L.join==="region") return REG[n]?resolve(REG[n],S.year):null;
+  if(L.join==="city")   return cityRec(S.city==="Pakistan"?n:S.city,S.year);
+  if(L.join==="enclave"){
+    const key=p.city+"|"+n, t=(D.enclave||{})[key];
+    return t&&HYP[t]?Object.assign({},HYP[t],{_terr:t,_enclave:true}):null;
+  }
+  return null;
+}
+
+/* ================= svg ========================================== */
+const svg=d3.select("#map"), gRoot=svg.append("g");
+const gCtx=gRoot.append("g"), gFill=gRoot.append("g"), gLine=gRoot.append("g"),
+      gPt=gRoot.append("g"), gLab=gRoot.append("g");
+let W=0,H=0,proj,path,labelsAlways=false,shapesOnly=false;
+const RAMP=["#12202e","#173c55","#1c5c78","#2a8296","#5aa8a0","#9fc78e","#dfd97a","#f0a94e","#e2683c"];
+const scale=d3.scaleSequential(t=>d3.interpolateRgbBasis(RAMP)(t));
+function size(){const r=document.getElementById("stage").getBoundingClientRect();
+  W=r.width;H=r.height;svg.attr("viewBox",`0 0 ${W} ${H}`);}
+const zoom=d3.zoom().scaleExtent([1,140]).on("zoom",e=>{
+  gRoot.attr("transform",e.transform);
+  gLine.attr("stroke-width",.85/e.transform.k);
+  gPt.selectAll("circle").attr("r",2.1/e.transform.k).attr("stroke-width",.7/e.transform.k);
+  gCtx.attr("stroke-width",.7/e.transform.k);
+  gLab.attr("opacity",labelsAlways?.9:
+        e.transform.k>2.2?1:e.transform.k>1.3?.72:0)
+      .selectAll("text").attr("font-size",(10.5/Math.pow(e.transform.k,.72))+"px");
+});
+svg.call(zoom);
+function fit(fc,pad=26){
+  proj=d3.geoMercator().fitExtent([[pad,pad],[W-pad,H-pad]],fc);
+  path=d3.geoPath(proj);
+}
+function tween(fc,pad=26){
+  const old=proj?proj.scale():null, oc=proj?proj.translate():null;
+  fit(fc,pad);
+  if(old){const ns=proj.scale(),nt=proj.translate();
+    proj.scale(old).translate(oc);
+    const i1=d3.interpolate(old,ns),i2=d3.interpolate(oc,nt);
+    d3.transition().duration(680).ease(d3.easeCubicInOut).tween("p",()=>t=>{
+      proj.scale(i1(t)).translate(i2(t));
+      gFill.selectAll("path").attr("d",path); gLine.selectAll("path").attr("d",path);
+      gPt.selectAll("circle").attr("cx",d=>proj(d.geometry.coordinates)[0])
+         .attr("cy",d=>proj(d.geometry.coordinates)[1]);
+      gLab.selectAll("text").attr("x",d=>path.centroid(d)[0]).attr("y",d=>path.centroid(d)[1]);
+    });}
+  svg.transition().duration(680).call(zoom.transform,d3.zoomIdentity);
+}
+
+/* ================= tooltip ====================================== */
+const tip=d3.select("#tip");
+function showTip(ev,name,sub,m,extra){
+  const L=LAYERS[S.layer];
+  let h=`<div class="n">${name}</div><div class="l">${sub}</div>`;
+  if(m){
+    // the active layer first, then context — never the same metric twice
+    const seen={};
+    const put=(k,v)=>{if(!seen[k]&&v!=null){seen[k]=1;h+=row(k,v);}};
+    if(!L.disabled){const v=L.acc(m); put(L.label,v==null?"—":L.fmt(v));}
+    put("Population", m.pop!=null?cnt(m.pop):null);
+    put("Area",       m.area?km2(m.area):null);
+    put("Density",    m.density!=null?dens(m.density):null);
+    put("Fee Units",  m.units!=null?m.units.toFixed(2):null);
+    put("Entry fee",  m.feeA!=null?money(m.feeA):null);
+  }else{
+    h+=`<div class="r"><span>No statistics at this level</span></div>`;
+  }
+  if(extra) h+=`<div class="src">${extra}</div>`;
+  tip.html(h).style("opacity",1)
+     .style("left",Math.min(ev.clientX+15,innerWidth-306)+"px")
+     .style("top",Math.min(ev.clientY+13,innerHeight-140)+"px");
+}
+const row=(k,v)=>`<div class="r"><span>${k}</span><span>${v}</span></div>`;
+const hideTip=()=>tip.style("opacity",0);
+
+/* ================= draw ========================================= */
+function draw(recentre){
+  size();
+  const L=LAYERS[S.layer], lv=lvl(), fs=features();
+  const fc={type:"FeatureCollection",features:fs};
+  if(!fs.length){gFill.selectAll("*").remove();gLine.selectAll("*").remove();
+    gLab.selectAll("*").remove();drawLegend();drawPanel();drawCrumb();return;}
+  // Context behind the active layer: the country when looking at all five
+  // cities, the city outline when looking inside one. Without it small
+  // polygons float with nothing to locate them against.
+  const ctxFs = S.city==="Pakistan"
+    ? (GEO.provinces?GEO.provinces.features:[])
+    : (GEO.cities?GEO.cities.features.filter(f=>f.properties.name===S.city):[]);
+  const ff=focusFeature();
+  const fitFs = ff ? [ff]
+    : (S.city==="Pakistan" && lv.geo!=="provinces") ? ctxFs.concat(fs) : fs;
+  const fitc={type:"FeatureCollection",features:fitFs};
+  const pad = ff?46:(S.city==="Pakistan"?18:30);
+  if(recentre||!proj) tween(fitc,pad); else fit(fitc,pad);
+
+  const cx=gCtx.attr("fill","#131c26").attr("stroke","#243244").attr("stroke-width",.7)
+    .selectAll("path").data(ctxFs,(f,i)=>"c"+i);
+  cx.exit().remove();
+  cx.enter().append("path").merge(cx).attr("d",path).attr("pointer-events","none");
+
+  const vals=fs.map(f=>{const m=datum(f);return m?L.acc(m):null})
+               .filter(v=>v!=null&&!isNaN(v));
+  // A choropleth is only meaningful when most shapes carry a value. Below that
+  // the level is drawn as boundaries, with the priced enclaves picked out, and
+  // the legend says so rather than showing an invented 0-to-1 scale.
+  shapesOnly = vals.length < Math.max(2, fs.length*0.25);
+  const ext=vals.length?d3.extent(vals):[0,1];
+  if(ext[0]===ext[1]) ext[1]=ext[0]+1;
+  scale.domain(ext);
+
+  const sel=gFill.selectAll("path").data(fs,(f,i)=>(f.properties.name||"")+i);
+  sel.exit().remove();
+  sel.enter().append("path").merge(sel)
+    .attr("d",path)
+    .attr("fill",f=>{const m=datum(f);const v=m?L.acc(m):null;
+      if(shapesOnly) return (m&&m._enclave)?"#8a6a24":"#1b2837";
+      return (v==null||isNaN(v))?"#16202c":scale(v);})
+    .attr("stroke","none")
+    .style("cursor","pointer")
+    .on("mousemove",(ev,f)=>{
+      const m=datum(f),p=f.properties;
+      let x="";
+      if(lv.join==="region"&&D.var&&D.var[p.name]!=null)
+        x=`Shape vs census area ${D.var[p.name]>0?"+":""}${D.var[p.name]}% — `
+         +`${LVKIND[(D.vkind||{})[p.name]]||"approximate"}. Statistics are exact.`;
+      else if(m&&m._enclave)
+        x=`Priced as <b>${m._terr}</b>. Outline covers ${m.geo_cover||0}% of the `
+         +`territory's ${km2(m.area)}.`;
+      else if(lv.join===null)
+        x="Boundary only — the census publishes no statistics at this level.";
+      showTip(ev,p.name||"—",sublabel(f),m,x);})
+    .on("mouseleave",hideTip)
+    .on("click",(ev,f)=>{S.sel=(S.sel===f.properties.name)?null:f.properties.name;
+      draw(false);});
+
+  const ln=gLine.selectAll("path").data(fs,(f,i)=>(f.properties.name||"")+i);
+  ln.exit().remove();
+  ln.enter().append("path").merge(ln)
+    .attr("d",path).attr("fill","none")
+    .attr("stroke",f=>f.properties.name===S.sel?"#ffffff":"#0b0f14")
+    .attr("stroke-width",f=>f.properties.name===S.sel?2:.85)
+    .attr("pointer-events","none");
+
+  // Labels: only what is actually on screen, largest first. Keying this off the
+  // zoom scale alone fails when the projection itself is fitted to a focus —
+  // the transform stays at k=1 while the view is deeply zoomed.
+  // Tested in lon/lat against the bounds actually being fitted, because during a
+  // fly-to the projection still holds the previous view.
+  const bb=d3.geoBounds(fitc), mx=(bb[1][0]-bb[0][0])*0.06, my=(bb[1][1]-bb[0][1])*0.06;
+  const inView=f=>{const c=d3.geoCentroid(f);
+    return c && !isNaN(c[0]) &&
+      c[0]>=bb[0][0]-mx && c[0]<=bb[1][0]+mx &&
+      c[1]>=bb[0][1]-my && c[1]<=bb[1][1]+my;};
+  const vis=fs.filter(inView);
+  const big=vis.slice().sort((a,b)=>(b.properties.area_km2||0)-(a.properties.area_km2||0))
+                .slice(0,34);
+  // `big` is already capped at a readable number, so show it. The zoom-based
+  // fade only earns its keep on dense unfocused layers.
+  labelsAlways = !!S.focus || vis.length<=34;
+  const lab=gLab.selectAll("text").data(big,(f,i)=>(f.properties.name||"")+i);
+  lab.exit().remove();
+  lab.enter().append("text").merge(lab)
+    .attr("x",f=>path.centroid(f)[0]).attr("y",f=>path.centroid(f)[1])
+    .attr("text-anchor","middle").attr("fill","#dbe6f0")
+    .attr("font-size","10.5px").attr("pointer-events","none")
+    .attr("paint-order","stroke").attr("stroke","#0b0f14").attr("stroke-width",2.4)
+    .text(f=>f.properties.name||"");
+  gLab.attr("opacity",labelsAlways?.9:fs.length>40?0:.8);
+
+  // city markers on the national view
+  const pts = S.city==="Pakistan"
+    ? CITY_LIST.map(c=>({type:"Feature",properties:{name:c},
+        geometry:{type:"Point",coordinates:D.city_pt[c]}})) : [];
+  const pt=gPt.selectAll("circle").data(pts,f=>f.properties.name);
+  pt.exit().remove();
+  pt.enter().append("circle").merge(pt)
+    .attr("cx",f=>proj(f.geometry.coordinates)[0])
+    .attr("cy",f=>proj(f.geometry.coordinates)[1])
+    .attr("r",2.6).attr("fill","#e6edf3").attr("stroke","#0b0f14").attr("stroke-width",.8)
+    .attr("pointer-events","none");
+
+  drawLegend(); drawPanel(); drawCrumb(); drawControls();
+}
+function sublabel(f){
+  const p=f.properties, lv=lvl();
+  const bits=[];
+  if(p.level) bits.push(p.level);
+  if(p.district) bits.push("in "+p.district);
+  if(p.group) bits.push("in "+p.group);
+  if(p.kind&&lv.geo==="city_areas") bits.push(p.kind);
+  if(p.source==="osm"||lv.geo==="city_areas") bits.push("OSM");
+  if(p.method) bits.push(p.method);
+  return bits.join(" · ")||S.city;
+}
+
+/* ================= legend ======================================= */
+function drawLegend(){
+  const L=LAYERS[S.layer];
+  if(shapesOnly&&!L.disabled){
+    d3.select("#ltitle").text(lvl().label+" — boundaries only");
+    d3.select("#ramp").style("background",
+      "linear-gradient(90deg,#1b2837 0%,#1b2837 62%,#8a6a24 62%,#8a6a24 100%)");
+    d3.select("#lscale").selectAll("span").data(["no statistics","priced enclave"])
+      .text(x=>x);
+    d3.select("#lnote").html(
+      `<span class="pill p-open">Open GIS</span> OpenStreetMap outlines. The census `
+      +`publishes nothing at this level, so nothing is shaded by value. Enclaves the `
+      +`model prices are picked out in gold.`);
+    d3.select("#yearflag").html(S.year==="2023"
+      ? `<b>2023</b> census — official` : `<b>2026</b> projected — derived`);
+    return;
+  }
+  d3.select("#ltitle").text(L.label+(L.disabled?" — unavailable":""));
+  d3.select("#ramp").style("background",
+    L.disabled?"#1b2634":`linear-gradient(90deg,${RAMP.join(",")})`);
+  const d=scale.domain();
+  d3.select("#lscale").selectAll("span").data(L.disabled?["",""]:[L.fmt(d[0]),L.fmt(d[1])])
+    .text(x=>x);
+  const pv=PROV[L.prov(S.year)];
+  d3.select("#lnote").html(`<span class="pill ${pv[0]}">${pv[1]}</span> ${L.note(S.year)}`);
+  d3.select("#yearflag").html(S.year==="2023"
+    ? `<b>2023</b> census — official`
+    : `<b>2026</b> projected — derived`);
+}
+
+/* ================= right panel ================================== */
+const kv=(k,v,neg)=>`<div class="kv${neg?" neg":""}"><span>${k}</span><span>${v}</span></div>`;
+function drawPanel(){
+  const R=d3.select("#right").html(""), L=LAYERS[S.layer], lv=lvl();
+
+  if(S.city==="Pakistan"){
+    const tot=CITY_LIST.reduce((a,c)=>{const m=cityRec(c,S.year);
+      return {pop:a.pop+(m.pop||0),hh:a.hh+(m.hh||0),area:a.area+(m.area||0),
+              units:a.units+(m.units||0),fee:a.fee+(m.feeA||0),
+              tl:a.tl+(m.topline||0),bl:a.bl+(m.bottom||0),q:a.q+(m.quota||0)};},
+      {pop:0,hh:0,area:0,units:0,fee:0,tl:0,bl:0,q:0});
+    R.append("div").attr("class","card").html(
+      `<h3>Five cities · ${S.year==="2023"?"census 2023":"projected 2026"}</h3>
+       <div class="big">${cnt(tot.pop)}</div><div class="sm">residents across the priced network</div>
+       ${kv("Households",cnt(tot.hh))}${kv("Area",km2(tot.area))}
+       ${kv("Territories","29 in 10 dealerships")}`);
+    R.append("div").attr("class","card").html(
+      `<h3>Network at the chosen anchor</h3>
+       ${kv("Anchor",(M.anchor_on||"?"))}
+       ${kv("Anchor fee",money(M.anchor_fee))}
+       ${kv("Rate / Fee Unit",money(M.rate))}
+       ${kv("Fee Units",tot.units.toFixed(2)+" / 100")}
+       ${kv("Entry fees",money(tot.fee))}
+       ${kv("Quota / qtr",cnt(tot.q)+" pumps")}
+       ${kv("Top line / yr",money(tot.tl))}
+       ${kv("Bottom line / yr",money(tot.bl),tot.bl<0)}`);
+    const rows=CITY_LIST.map(c=>[c,cityRec(c,S.year)])
+      .sort((a,b)=>(L.acc(b[1])||-1e18)-(L.acc(a[1])||-1e18));
+    R.append("div").attr("class","card").html(
+      `<h3>By city · ${L.label}</h3><table><tr><th>City</th>
+        <th style="text-align:right">${L.disabled?"Pop":"Value"}</th></tr>
+       ${rows.map(([c,m])=>`<tr class="pick" data-city="${c}"><td>${c}</td>
+         <td style="text-align:right">${L.disabled?cnt(m.pop):(L.acc(m)==null?"—":L.fmt(L.acc(m)))}</td></tr>`).join("")}
+       </table><div class="hint" style="margin-top:8px">Click a city to open it.</div>`);
+    R.selectAll("tr.pick").on("click",function(){
+      S.city=this.dataset.city; S.level=LEVELS[S.city][0].id;
+      S.sel=null; S.focus=null; draw(true);});
+    return;
+  }
+
+  // ---- a single city
+  const cm=cityRec(S.city,S.year);
+  R.append("div").attr("class","card").html(
+    `<h3>${S.city} · ${S.year==="2023"?"census 2023":"projected 2026"}</h3>
+     <div class="big">${cnt(cm.pop)}</div><div class="sm">residents · ${km2(cm.area)}</div>
+     ${kv("Households",cnt(cm.hh))}${kv("Density",dens(cm.density))}
+     ${cm.newhh!=null?kv("New households",cnt(cm.newhh)+" ("+cm.span+")"):""}
+     ${kv("Territories",cm.territories+" priced")}`);
+  R.append("div").attr("class","card").html(
+    `<h3>Dealership model · scenario ${M.active||"A"}</h3>
+     ${kv("Fee Units",cm.units.toFixed(2))}
+     ${kv("Entry fees",money(cm.feeA))}
+     ${kv("Pump points",cnt(cm.spp))}
+     ${kv("Quota / qtr",cnt(cm.quota)+" pumps")}
+     ${kv("Top line / yr",money(cm.topline))}
+     ${kv("Bottom line / yr",money(cm.bottom),cm.bottom<0)}
+     <div class="hint" style="margin-top:8px">Anchor: ${M.anchor_on} at
+     ${money(M.anchor_fee)} → ${money(M.rate)} per Fee Unit. Figures match
+     Dealership_Model.xlsx exactly.</div>`);
+
+  if((D.city_note||{})[S.city])
+    R.append("div").attr("class","card").html(
+      `<h3>How this city is drawn</h3><div class="infobox">${D.city_note[S.city]}</div>`);
+
+  // territory table, always the model's own units regardless of drawn level
+  const terr=Object.entries(REG).filter(([,v])=>v.city===S.city)
+    .map(([k,v])=>[k,resolve(v,S.year)])
+    .sort((a,b)=>(L.acc(b[1])||-1e18)-(L.acc(a[1])||-1e18));
+  if(terr.length) R.append("div").attr("class","card").html(
+    `<h3>Priced territories · ${L.label}</h3>
+     <table><tr><th>Territory</th><th style="text-align:right">${L.disabled?"Pop":"Value"}</th></tr>
+     ${terr.map(([k,m])=>`<tr class="pick ${S.sel===k?"on":""}" data-name="${k}">
+       <td>${k}</td><td style="text-align:right">${
+       L.disabled?cnt(m.pop):(L.acc(m)==null?"—":L.fmt(L.acc(m)))}</td></tr>`).join("")}
+     </table>`);
+  R.selectAll("tr.pick").on("click",function(){
+    S.sel=this.dataset.name===S.sel?null:this.dataset.name; draw(false);});
+
+  // selection detail
+  const r=S.sel&&REG[S.sel]?resolve(REG[S.sel],S.year):null;
+  if(r){
+    R.append("div").attr("class","card").html(
+      `<h3>${S.sel}</h3>
+       ${kv("Tier",r.tier+" · "+r.club)}
+       ${kv("Population",cnt(r.pop))}
+       ${kv("Area",km2(r.area))}
+       ${kv("Density",dens(r.density))}
+       ${kv("Households",cnt(r.hh))}
+       ${kv("Growth (census)",rate(r.cagr))}
+       ${r.newhh!=null?kv("New households",cnt(r.newhh)):""}
+       ${kv("House share",pc(r.house_share))}
+       ${kv("Pump points",cnt(r.spp))}
+       ${kv("Fee Units",r.units!=null?r.units.toFixed(2):"—")}
+       ${kv("Entry fee",money(r.feeA))}
+       ${kv("Quota / qtr",cnt(r.quota))}
+       ${kv("Top line / yr",money(r.topline))}
+       ${kv("Bottom line / yr",money(r.bottom),r.bottom<0)}
+       ${kv("Payback",mons(r.payback))}`);
+    if(D.var&&D.var[S.sel]!=null){
+      const k=(D.vkind||{})[S.sel];
+      R.append("div").attr("class","card").html(
+        `<h3>Boundary accuracy</h3><div class="warnbox">
+         The polygon drawn for <b>${S.sel}</b> differs from its census area by
+         <b>${D.var[S.sel]>0?"+":""}${D.var[S.sel]}%</b> —
+         ${LVKIND[k]||"approximate"}. Every statistic above is the exact census
+         or workbook figure; only the outline is approximate.${
+         k==="vintage"?" These are the ten 2024 tehsils, which subdivide the five "
+         +"census tehsils, so a same-named outline is a fraction of its census unit.":""}
+         </div>`);
+    }
+  }
+
+  // enclaves inside this city
+  const enc=Object.entries(HYP).filter(([,v])=>v.city===S.city);
+  if(enc.length) R.append("div").attr("class","card").html(
+    `<h3>Carved-out enclaves</h3>
+     <table><tr><th>Enclave</th><th style="text-align:right">Fee</th>
+     <th style="text-align:right">Drawn</th></tr>
+     ${enc.map(([k,v])=>`<tr><td>${k}</td>
+       <td style="text-align:right">${money(v.feeA)}</td>
+       <td style="text-align:right">${v.geo_cover?v.geo_cover+"%":"—"}</td></tr>`).join("")}
+     </table>
+     <div class="hint" style="margin-top:8px">Sold separately, and subtracted from
+     the parent territory's fee <i>and</i> quota. "Drawn" is how much of the priced
+     area has an open outline — the rest has none, so it is not drawn rather than
+     estimated.</div>`);
+}
+
+/* ================= controls & crumb ============================= */
+function ctl(sel,items,cur,fn){
+  const c=d3.select(sel).html("");
+  items.forEach(it=>{
+    if(it.sep){c.append("div").attr("class","opt sep").text(it.label);return;}
+    c.append("button")
+      .attr("class","opt"+(it.id===cur?" on":"")+(it.off?" off":""))
+      .html(it.label+(it.tag?`<span class="tag">${it.tag}</span>`:""))
+      .on("click",()=>{if(!it.off) fn(it.id);});
+  });
+}
+function drawControls(){
+  ctl("#c-city",[{id:"Pakistan",label:"All Pakistan"}]
+      .concat(CITY_LIST.map(c=>({id:c,label:c,
+        tag:(LEVELS[c]||[]).length>1?(LEVELS[c].length+" levels"):"1 level"}))),
+    S.city,id=>{S.city=id;S.level=(LEVELS[id]||LEVELS.Pakistan)[0].id;S.sel=null;S.focus=null;draw(true);});
+  ctl("#c-level",levels().map(l=>({id:l.id,label:l.label,
+      tag:l.join?null:"shapes only"})),
+    S.level,id=>{
+      // dropping a level keeps the current selection as the thing to enlarge
+      const deeper=levels().findIndex(l=>l.id===id)>levels().findIndex(l=>l.id===S.level);
+      if(deeper&&S.sel) S.focus=S.sel;
+      else if(!deeper) S.focus=null;
+      S.level=id;S.sel=null;draw(true);});
+  ctl("#c-layer",Object.entries(LAYERS).map(([id,l])=>({id,label:l.label,
+      off:l.disabled,sep:l.sep,tag:PROV[l.prov(S.year)][1]})),
+    S.layer,id=>{S.layer=id;draw(false);});
+
+  const y=d3.select("#c-year").html("");
+  YRS.forEach(v=>y.append("button").attr("class",v===S.year?"on":"")
+    .html(v+`<span class="y">${v==="2023"?"census":"projected"}</span>`)
+    .on("click",()=>{S.year=v;draw(false);}));
+  d3.select("#yearhint").text(S.year==="2023"
+    ? "Official PBS 2023 figures."
+    : "Census growth compounded to 2026, capped at "+pc(M.growth_cap)
+      +". This is the model's pricing base year.");
+  d3.select("#brandsub").text(S.city==="Pakistan"
+    ? "5 cities · 29 territories" : S.city+" · "+lvl().label);
+}
+function drawCrumb(){
+  const c=d3.select("#crumb").html("");
+  c.append("button").text("Pakistan")
+   .on("click",()=>{S.city="Pakistan";S.level="cities";S.sel=null;S.focus=null;draw(true);});
+  if(S.city!=="Pakistan"){
+    c.append("span").attr("class","sep").text("›");
+    c.append("button").text(S.city)
+     .on("click",()=>{S.level=LEVELS[S.city][0].id;S.sel=null;S.focus=null;draw(true);});
+    c.append("span").attr("class","sep").text("›");
+    c.append("span").attr("class","cur").text(lvl().label);
+  }else{
+    c.append("span").attr("class","sep").text("›");
+    c.append("span").attr("class","cur").text(lvl().label);
+  }
+  if(S.focus){
+    c.append("span").attr("class","sep").text("· zoomed to");
+    c.append("button").text(S.focus+" ✕")
+     .on("click",()=>{S.focus=null;draw(true);});
+  }
+  if(S.sel){c.append("span").attr("class","sep").text("›");
+    c.append("span").attr("class","cur").text(S.sel);}
+}
+
+addEventListener("resize",()=>draw(false));
+drawControls(); draw(true);
+</script>
+</body></html>
