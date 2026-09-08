@@ -14,12 +14,27 @@
 html,body{height:100%;background:var(--bg);color:var(--ink);
  font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
  -webkit-font-smoothing:antialiased;overflow:hidden}
-#app{display:grid;grid-template-columns:242px 1fr 318px;height:100vh}
+#app{display:grid;grid-template-columns:var(--lw,242px) 1fr var(--rw,318px);height:100vh}
+#app.hL{--lw:0px} #app.hR{--rw:0px}
 @media(max-width:1180px){#app{grid-template-columns:1fr}
  #left,#right{position:absolute;z-index:20;height:auto;max-height:44vh;width:264px;top:8px}
- #left{left:8px} #right{right:8px}}
+ #left{left:8px} #right{right:8px}
+ /* overlay mode: the panes are out of grid flow, so take them out entirely */
+ .pane.hid{display:none}}
 
-.pane{background:var(--panel);border-right:1px solid var(--line);overflow-y:auto}
+.pane{background:var(--panel);border-right:1px solid var(--line);overflow-y:auto;min-width:0}
+/* Grid mode: keep the pane as a grid item and let its column go to 0, then clip.
+   display:none would unplace it and slide #stage into the collapsed column. */
+.pane.hid{overflow:hidden;border:none}
+
+/* drawer handles, always reachable even with both panels shut */
+.tg{position:absolute;top:50%;transform:translateY(-50%);z-index:12;
+ width:15px;height:56px;background:var(--panel);border:1px solid var(--line);
+ color:var(--dim);cursor:pointer;font:inherit;font-size:10px;padding:0;
+ display:flex;align-items:center;justify-content:center;transition:color .13s,background .13s}
+.tg:hover{background:var(--panel2);color:var(--acc)}
+#tgL{left:0;border-left:none;border-radius:0 6px 6px 0}
+#tgR{right:0;border-right:none;border-radius:6px 0 0 6px}
 #right{border-right:none;border-left:1px solid var(--line)}
 .pane::-webkit-scrollbar{width:6px}
 .pane::-webkit-scrollbar-thumb{background:#243244;border-radius:3px}
@@ -125,6 +140,8 @@ tr.on td{background:rgba(78,161,255,.1)}
  </div>
  <div id="stage">
   <div id="crumb"></div><div id="yearflag"></div><svg id="map"></svg>
+  <button class="tg" id="tgL" title="Hide controls  [">‹</button>
+  <button class="tg" id="tgR" title="Hide detail  ]">›</button>
   <div id="legend"><div class="lt" id="ltitle">Population</div>
    <div id="ramp"></div><div id="lscale"><span></span><span></span></div>
    <div id="lnote"></div></div>
@@ -730,7 +747,43 @@ function drawCrumb(){
     c.append("span").attr("class","cur").text(S.sel);}
 }
 
+/* ================= collapsible panels ===========================
+   Hiding a panel changes the grid column, so the SVG has to be re-measured
+   and re-fitted afterwards — the window never fires a resize for this. */
+const PANE={L:{pane:"#left",cls:"hL",btn:"#tgL",open:"‹",shut:"›",
+                title:["Hide controls  [","Show controls  ["]},
+            R:{pane:"#right",cls:"hR",btn:"#tgR",open:"›",shut:"‹",
+                title:["Hide detail  ]","Show detail  ]"]}};
+let hidden={L:false,R:false};
+try{const v=localStorage.getItem("pum.panels");
+    if(v) hidden=Object.assign(hidden,JSON.parse(v));}catch(e){}
+
+function applyPanels(redraw){
+  Object.entries(PANE).forEach(([k,p])=>{
+    const off=hidden[k];
+    d3.select("#app").classed(p.cls,off);
+    d3.select(p.pane).classed("hid",off);
+    d3.select(p.btn).text(off?p.shut:p.open).attr("title",p.title[off?1:0]);
+  });
+  try{localStorage.setItem("pum.panels",JSON.stringify(hidden));}catch(e){}
+  if(redraw) draw(false);
+}
+function togglePane(k){hidden[k]=!hidden[k];applyPanels(true);}
+d3.select("#tgL").on("click",()=>togglePane("L"));
+d3.select("#tgR").on("click",()=>togglePane("R"));
+addEventListener("keydown",e=>{
+  if(e.metaKey||e.ctrlKey||e.altKey) return;
+  const t=e.target.tagName;
+  if(t==="INPUT"||t==="TEXTAREA") return;
+  if(e.key==="[") togglePane("L");
+  else if(e.key==="]") togglePane("R");
+  else if(e.key.toLowerCase()==="f"){            // both, for presenting
+    const any=hidden.L||hidden.R;
+    hidden.L=hidden.R=!any; applyPanels(true);
+  }
+});
+
 addEventListener("resize",()=>draw(false));
-drawControls(); draw(true);
+applyPanels(false); drawControls(); draw(true);
 </script>
 </body></html>
