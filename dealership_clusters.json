@@ -2,7 +2,7 @@
   "_note": [
     "The dealership clustering scheme. This is a commercial grouping, not a census",
     "unit, so it lives here rather than in Dealership_Model.xlsx and is edited by",
-    "hand. Deliberately carries no fee: the map is geography and population only.",
+    "hand. It carries the client's proposed entry fee; see the note below.",
     "",
     "Each area lists the outline name prefixes that identify it in the geometry.",
     "Matching is prefix-anchored, not substring, so 'E-7' cannot pick up",
@@ -10,11 +10,18 @@
     "it simply has no open outline to draw, and is labelled as such.",
     "",
     "refresh.py reports coverage on every run. Add a prefix here to link an area",
-    "once an outline for it exists."
+    "once an outline for it exists.",
+    "",
+    "proposed_fee_pkr is the client's own two-tier proposal (Rs 1.5 Cr / Rs 1 Cr),",
+    "entered by hand. It is NOT the model's derived fee schedule and is labelled",
+    "'proposed' everywhere it appears. Nothing else commercial is carried: no",
+    "quota, pump point, revenue, profit or payback figure is read from the",
+    "workbook. Because this file puts a price in the page, the built HTML should",
+    "be treated as commercially sensitive when hosting."
   ],
   "clusters": [
     {
-      "code": "KHI-1", "name": "South & Coastal", "city": "Karachi",
+      "code": "KHI-1", "proposed_fee_pkr": 15000000, "name": "South & Coastal", "city": "Karachi",
       "premium": true,
       "areas": [
         {"label": "Clifton", "prefixes": ["Clifton", "Old Clifton"]},
@@ -24,7 +31,7 @@
       ]
     },
     {
-      "code": "KHI-2", "name": "East & Korangi", "city": "Karachi",
+      "code": "KHI-2", "proposed_fee_pkr": 10000000, "name": "East & Korangi", "city": "Karachi",
       "premium": true,
       "areas": [
         {"label": "KDA Scheme 1", "prefixes": ["KDA Scheme 1"]},
@@ -36,7 +43,7 @@
       ]
     },
     {
-      "code": "KHI-3", "name": "Central, West & Keamari", "city": "Karachi",
+      "code": "KHI-3", "proposed_fee_pkr": 10000000, "name": "Central, West & Keamari", "city": "Karachi",
       "premium": true,
       "areas": [
         {"label": "North Nazimabad", "prefixes": ["North Nazimabad"]},
@@ -47,7 +54,7 @@
       ]
     },
     {
-      "code": "KHI-4", "name": "Malir & Outer", "city": "Karachi",
+      "code": "KHI-4", "proposed_fee_pkr": 15000000, "name": "Malir & Outer", "city": "Karachi",
       "premium": true,
       "areas": [
         {"label": "Malir Cantt", "prefixes": ["Malir Cantonment", "Malir Cantt"]},
@@ -57,7 +64,7 @@
       ]
     },
     {
-      "code": "LHE-1", "name": "South Lahore", "city": "Lahore",
+      "code": "LHE-1", "proposed_fee_pkr": 15000000, "name": "South Lahore", "city": "Lahore",
       "premium": true,
       "areas": [
         {"label": "DHA Lahore I-VI", "prefixes": ["DHA Phase 1", "DHA Phase 2", "DHA Phase 3", "DHA Phase 4", "DHA Phase 5", "DHA Phase 6"]},
@@ -71,7 +78,7 @@
       ]
     },
     {
-      "code": "LHE-2", "name": "Central Lahore", "city": "Lahore",
+      "code": "LHE-2", "proposed_fee_pkr": 10000000, "name": "Central Lahore", "city": "Lahore",
       "premium": false,
       "note": "No designated premium cluster. The areas below are representative localities in the central tehsils, taken from the Lahore locality layer — not a premium grouping.",
       "areas": [
@@ -90,7 +97,7 @@
       ]
     },
     {
-      "code": "LHE-3", "name": "West Lahore", "city": "Lahore",
+      "code": "LHE-3", "proposed_fee_pkr": 10000000, "name": "West Lahore", "city": "Lahore",
       "premium": true,
       "areas": [
         {"label": "Gulberg I-V", "prefixes": ["Gulberg"]},
@@ -101,7 +108,7 @@
       ]
     },
     {
-      "code": "MUX-1", "name": "Multan", "city": "Multan",
+      "code": "MUX-1", "proposed_fee_pkr": 15000000, "name": "Multan", "city": "Multan",
       "premium": true,
       "areas": [
         {"label": "Multan Cantt", "prefixes": ["Multan Cantonment", "Multan Cantt"]},
@@ -109,7 +116,7 @@
       ]
     },
     {
-      "code": "PEW-1", "name": "Peshawar", "city": "Peshawar",
+      "code": "PEW-1", "proposed_fee_pkr": 10000000, "name": "Peshawar", "city": "Peshawar",
       "premium": true,
       "areas": [
         {"label": "Hayatabad Phases 1-7", "prefixes": ["Hayatabad"]},
@@ -118,7 +125,7 @@
       ]
     },
     {
-      "code": "ISB-1", "name": "Islamabad", "city": "Islamabad",
+      "code": "ISB-1", "proposed_fee_pkr": 10000000, "name": "Islamabad", "city": "Islamabad",
       "premium": true,
       "areas": [
         {"label": "DHA Islamabad I-V", "prefixes": ["DHA Phase", "DHA Islamabad"]},

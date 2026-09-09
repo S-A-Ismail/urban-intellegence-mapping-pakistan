@@ -17,18 +17,27 @@ openpyxl is not needed.
 and writes:
     pakistan_urban_map.html
 
-SCOPE — this map is a geography and population tool.
+SCOPE — geography, population, and one price.
 
-No fee, price, quota, pump-point, revenue or profit figure is read from the
-workbook or written into the page. Suppressing them in the UI alone would be
-false secrecy: the numbers would still sit in the page source for anyone who
-opened it. They are therefore never extracted at all.
+Nothing commercial is read from the workbook. No quota, pump point, revenue,
+profit or payback figure is extracted, and neither is the model's derived fee
+schedule. Suppressing those in the UI alone would be false secrecy: they would
+still sit in the page source for anyone who opened it, so they are never
+extracted at all. The FORBIDDEN check at the bottom fails the build if one ever
+reaches the output.
 
-The only thing taken from the commercial side of the model is the *structure* —
-which dealership club each territory belongs to, and the ten clubs listed on the
-DealerStructure sheet. Those sheets also carry fees and revenue; none of those
-columns are read. See CHECK_FORBIDDEN at the bottom, which fails the build if a
-money figure ever reaches the output.
+Two things do come from the commercial side:
+
+  * the *structure* — which dealership covers each region, and the ten clubs on
+    the DealerStructure sheet. That sheet's fee and revenue columns are skipped.
+
+  * the *proposed entry fee* per dealership, hand-entered in
+    dealership_clusters.json. This is the client's own two-tier proposal
+    (Rs 1.5 Cr / Rs 1 Cr), not the model's derived figure, and is labelled
+    "proposed" wherever it is shown.
+
+Because a price is now in the page, treat the built HTML as commercially
+sensitive when hosting it.
 """
 import json, sys, os, re, zipfile
 
@@ -225,8 +234,8 @@ if REGIONS:
 
 print("· model data: %s (%d regions + %d enclaves, %d cities, %d dealerships)"
       % (src, len(REGIONS), len(HYPER), len(CITIES), len(DEALERS)))
-print("· scope: geography and population only — no fee, quota or revenue figure "
-      "is read from the workbook")
+print("· scope: geography and population — no fee, quota or revenue figure is "
+      "read from the workbook")
 
 # ------------------------------------------------------------ census overrides
 if os.path.exists(p("census.json")):
@@ -358,9 +367,15 @@ if os.path.exists(p("dealership_clusters.json")):
             total_drawn += 1 if found else 0
         CLUSTERS.append(dict(code=c["code"], name=c["name"], city=c["city"],
                              premium=c.get("premium", True), note=c.get("note"),
+                             proposed_fee_pkr=c.get("proposed_fee_pkr"),
                              areas=areas))
+    net = sum(c.get("proposed_fee_pkr") or 0 for c in CLUSTERS)
     print("· clusters: %d dealerships, %d named areas, %d with an outline"
           % (len(CLUSTERS), total_areas, total_drawn))
+    if net:
+        print("· proposed entry fees carried: Rs %.2f Cr across the network "
+              "(client's two-tier proposal, not the model's derived schedule)"
+              % (net / 1e7))
     for c in CLUSTERS:
         miss = [a["label"] for a in c["areas"] if not a["found"]]
         if miss:
@@ -395,8 +410,13 @@ DATA = dict(regions=REGIONS, hyper=HYPER, cities=CITIES, dealers=DEALERS,
 
 # ------------------------------------------------------------- forbidden keys
 # A guard, not a formality. If a future edit reintroduces a commercial field the
-# build fails loudly rather than quietly publishing the fee schedule inside the
-# page source.
+# build fails loudly rather than quietly publishing the model's fee schedule,
+# quotas or margins inside the page source.
+#
+# ALLOWED is the one deliberate exception: the client's proposed per-dealership
+# entry fee, typed by hand into dealership_clusters.json. It is not derived from
+# the workbook and does not open the door to the rest of the model.
+ALLOWED = {"proposed_fee_pkr"}
 FORBIDDEN = {"fee", "feea", "feeb", "units", "quota", "quota_yr", "topline",
              "bottom", "gross", "payback", "spp", "spp18", "spp30", "rpp",
              "outlay", "fee_yr", "cum4", "roi", "inv", "addressable", "asp",
@@ -406,7 +426,7 @@ FORBIDDEN = {"fee", "feea", "feeb", "units", "quota", "quota_yr", "topline",
 def check(node, trail="DATA"):
     if isinstance(node, dict):
         for k, v in node.items():
-            if str(k).lower() in FORBIDDEN:
+            if str(k).lower() in FORBIDDEN and str(k) not in ALLOWED:
                 sys.exit("! %s.%s is a commercial field — this map is geography "
                          "and population only. Remove it from read_workbook()."
                          % (trail, k))

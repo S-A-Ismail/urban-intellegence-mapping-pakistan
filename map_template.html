@@ -138,6 +138,7 @@ tr.on td{background:rgba(78,161,255,.1)}
 .chip{font-size:9.5px;background:var(--panel2);border:1px solid var(--line);
  color:var(--dim);padding:2px 6px;border-radius:3px;white-space:nowrap}
 .chip.off{opacity:.42;border-style:dashed}
+.ch .fee{color:var(--gold);font-family:var(--mono)}
 button.dl{width:100%;background:var(--panel2);border:1px solid var(--line);
  color:var(--acc);font:inherit;font-size:11.5px;font-weight:550;padding:8px;
  border-radius:5px;cursor:pointer;transition:.13s}
@@ -180,6 +181,15 @@ const dens =v=>(v==null||isNaN(v))?"—":cnt(v)+" /km²";
 const rate =v=>(v==null||isNaN(v))?"—":(v*100).toFixed(2)+"%/yr";
 const pc   =v=>(v==null||isNaN(v))?"—":(v*100).toFixed(1)+"%";
 const dec  =(v,d)=>(v==null||isNaN(v))?"—":v.toFixed(d===undefined?2:d);
+/* The map carries exactly one monetary figure: the proposed entry fee per
+   dealership. PKR in Lakh and Crore, which is how it gets quoted. */
+function money(v){
+  if(v==null||isNaN(v)) return "—";
+  const a=Math.abs(v), s=v<0?"−":"";
+  if(a>=1e7) return s+"Rs "+(a/1e7).toFixed(2)+" Cr";
+  if(a>=1e5) return s+"Rs "+(a/1e5).toFixed(2)+" L";
+  return s+"Rs "+Math.round(a).toLocaleString("en-US");
+}
 const YRS=["2023","2026"];
 
 /* ================= records =======================================
@@ -364,8 +374,11 @@ function datum(f){
     const key=p.city+"|"+n, t=(D.enclave||{})[key];
     return t&&HYP[t]?Object.assign({},HYP[t],{_terr:t,_enclave:true}):null;
   }
-  if(L.join==="cluster") return {club:p._club,clubName:p._clubName,
-    area:p.area_km2,_area:p._area,_cluster:true};
+  if(L.join==="cluster"){
+    const c=CLUSTERS.find(x=>x.code===p._club);
+    return {club:p._club,clubName:p._clubName,area:p.area_km2,_area:p._area,
+            fee:c?c.proposed_fee_pkr:null,_cluster:true};
+  }
   return null;
 }
 
@@ -424,6 +437,7 @@ function showTip(ev,name,sub,m,extra){
     put("Density",    m.density!=null?dens(m.density):null);
     put("Dealership", m.club?(m.club+(m.clubName?" · "+m.clubName:"")):null);
     put("Cluster area", m._area||null);
+    put("Proposed fee", m.fee!=null?money(m.fee):null);
   }else{
     h+=`<div class="r"><span>No statistics at this level</span></div>`;
   }
@@ -647,13 +661,20 @@ function drawPanel(){
       S.city=this.dataset.city; S.level=LEVELS[S.city][0].id;
       S.sel=null; S.focus=null; draw(true);});
     const allc=R.append("div").attr("class","card");
-    allc.html(`<h3>Dealership clusters · all cities</h3>`);
+    const net=CLUSTERS.reduce((t,c)=>t+(c.proposed_fee_pkr||0),0);
+    allc.html(`<h3>Dealership clusters · all cities</h3>`
+      +(net?`<div class="kv"><span>Proposed entry fees</span>
+             <span>${money(net)}</span></div>
+             <div class="hint" style="margin:2px 0 9px">Across ${CLUSTERS.length}
+             dealerships. Proposed figures, not the model's derived schedule.</div>`:""));
     CLUSTERS.forEach(c=>{
       const drawn=c.areas.filter(a=>a.found.length).length;
       allc.append("div").attr("class","clus").html(
         `<div class="ch"><i style="background:${CLUB_COLOR[c.code]||"#3a4a5c"}"></i>
            <b>${c.code}</b> ${c.name}
-           <span class="cn">${c.city} · ${drawn}/${c.areas.length} drawn</span></div>
+           <span class="cn">${c.proposed_fee_pkr!=null
+             ?`<b class="fee">${money(c.proposed_fee_pkr)}</b> · `:""}${
+             c.city}</span></div>
          <div class="chips">${c.areas.map(a=>
            `<span class="chip${a.found.length?"":" off"}">${a.label}</span>`).join("")}</div>`);
     });
@@ -747,7 +768,9 @@ function drawPanel(){
       card.append("div").attr("class","clus").html(
         `<div class="ch"><i style="background:${CLUB_COLOR[c.code]||"#3a4a5c"}"></i>
            <b>${c.code}</b> ${c.name}
-           <span class="cn">${drawn}/${c.areas.length} drawn</span></div>
+           <span class="cn">${c.proposed_fee_pkr!=null
+             ?`<b class="fee">${money(c.proposed_fee_pkr)}</b> · `:""}${
+             drawn}/${c.areas.length} drawn</span></div>
          ${c.premium?"":`<div class="hint" style="margin:3px 0 5px">${c.note||""}</div>`}
          <div class="chips">${chips}</div>`);
     });
@@ -799,6 +822,10 @@ const CSV_COLS=[
  ["Dealership_name",(n,p,m)=>{const c=(D.dealers||{})[(m&&m.club)||p._club];
     return c?c.name:(p._clubName||"");}],
  ["Premium_area",(n,p)=>p._area||""],
+ ["Proposed_fee_PKR",(n,p,m)=>{
+    const code=(m&&m.club)||p._club;
+    const c=CLUSTERS.find(x=>x.code===code);
+    return c&&c.proposed_fee_pkr!=null?c.proposed_fee_pkr:"";}],
  ["Shape_vs_census_pct",n=>(D.var&&D.var[n]!=null)?D.var[n]:""],
  ["Shape_note",  n=>(D.vkind&&D.vkind[n])?LVKIND[D.vkind[n]]:""],
  ["Geometry_source",(n,p)=>p.source||p.method||(lvl().geo==="city_areas"?"osm":"admin")],

@@ -94,17 +94,24 @@ Only **Assumptions** holds inputs (blue on yellow). Everything else is formulas.
 ### Map
 Covers all five cities, census 2023 and projected 2026.
 
-**Scope: geography and population only.** The map carries no fee, price, quota,
-pump-point, revenue or profit figure. They are not suppressed in the UI — they
-are never extracted from the workbook, because hiding them in the interface
-while leaving them in the page source would be false secrecy. `refresh.py` ends
-with a `FORBIDDEN` key check that fails the build if a commercial field ever
-reaches the output.
+**Scope: geography, population, and one price.** Nothing commercial is read from
+the workbook — no quota, pump point, revenue, profit or payback figure, and not
+the model's derived fee schedule. They are not suppressed in the UI, they are
+never extracted, because hiding them in the interface while leaving them in the
+page source would be false secrecy. `refresh.py` ends with a `FORBIDDEN` key
+check that fails the build if one reaches the output.
 
-The only thing taken from the commercial side is the *structure*: which
-dealership club each region belongs to, and the ten clubs on the DealerStructure
-sheet (code, name, city, region count). That sheet's fee, quota and revenue
-columns are not read.
+Two things come from the commercial side:
+- the *structure* — which club covers each region, and the ten clubs on
+  DealerStructure (code, name, city, region count). That sheet's fee, quota and
+  revenue columns are not read.
+- the *proposed entry fee* per dealership, hand-entered in
+  `dealership_clusters.json` as `proposed_fee_pkr` — the client's two-tier
+  Rs 1.5 Cr / Rs 1 Cr proposal, network Rs 12.00 Cr. It is **not** the model's
+  derived schedule (network Rs 10.58 Cr) and the two differ per dealership, so
+  the UI always labels it "proposed". It is the sole entry in `ALLOWED`.
+
+**Because a price is in the page, the built HTML is commercially sensitive.**
 
 | Path | Role |
 |---|---|
@@ -135,9 +142,9 @@ Selecting a territory and dropping a level enlarges it — that is how you get
 from Karachi South to Clifton and Defence.
 
 **Units in the UI:** standard units everywhere — grouped integers for counts,
-km² for area, /km² for density, % for rates. There is no currency formatter,
-because there is nothing to format with one. If a future change reintroduces
-money, it belongs in a separate internal build, not this one.
+km² for area, /km² for density, % for rates. The single monetary figure, the
+proposed entry fee, uses PKR Lakh and Crore via `money()`. Do not format money
+any other way.
 
 **Layers:** population, density, growth, households, new households, new-housing
 intensity, population added, household size, area — nine census-derived — plus

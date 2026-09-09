@@ -3,12 +3,15 @@
 Five cities: **Karachi, Lahore, Islamabad, Peshawar, Multan**, drawn from
 `Dealership_Model.xlsx`.
 
-**Scope: geography and population only.** No fee, price, quota, pump-point,
-revenue or profit figure appears in this map — and none is read from the
-workbook in the first place, so none sits in the page source either. The only
-thing taken from the commercial side of the model is which dealership covers
-which region. Safe to hand to anyone who should see population data but not
-pricing.
+**Scope: geography, population, and one price.** Nothing commercial is read from
+the workbook — no quota, pump point, revenue, profit or payback figure, and not
+the model's derived fee schedule either. The map does carry the **proposed entry
+fee** per dealership (the two-tier Rs 1.5 Cr / Rs 1 Cr proposal), hand-entered in
+`dealership_clusters.json` and labelled *proposed* everywhere it appears.
+
+Because a price is in the page, **treat the built HTML as commercially
+sensitive** when hosting it — see the password-protection step if you put it on a
+public server.
 
 ## Just viewing it
 
@@ -85,22 +88,27 @@ from the workbook, so changing an assumption there is the only thing you need to
 do.
 
 `refresh.py` ends with a `FORBIDDEN` key check. If an edit ever reintroduces a
-fee, quota or revenue field, the build fails with a message naming it rather
-than quietly publishing the fee schedule inside the page.
+quota, revenue or model-derived fee field, the build fails with a message naming
+it rather than quietly publishing the model's schedule inside the page. The one
+deliberate exception is `proposed_fee_pkr`, listed in `ALLOWED`.
 
 ---
 
 ## Changing the dealership clustering
 
 The scheme lives in `dealership_clusters.json` — a commercial grouping, not a
-census unit, so it is hand-edited rather than read from the workbook. It carries
-no fee, in keeping with the scope above.
+census unit, so it is hand-edited rather than read from the workbook.
 
 ```json
-{ "code": "KHI-1", "name": "South & Coastal", "city": "Karachi",
-  "premium": true,
+{ "code": "KHI-1", "proposed_fee_pkr": 15000000,
+  "name": "South & Coastal", "city": "Karachi", "premium": true,
   "areas": [ { "label": "Clifton", "prefixes": ["Clifton", "Old Clifton"] } ] }
 ```
+
+`proposed_fee_pkr` is in PKR and renders as Lakh or Crore. It is the client's own
+proposal, **not** the model's derived figure — the two differ (LHE-3 is Rs 1 Cr
+proposed against Rs 0.78 Cr derived, KHI-4 Rs 1.5 Cr against Rs 0.93 Cr), so the
+UI always says "proposed".
 
 `prefixes` are the outline names that identify the area in the geometry. Matching
 is **prefix-anchored, not substring**, so `E-7` cannot pick up "Bahria Town
