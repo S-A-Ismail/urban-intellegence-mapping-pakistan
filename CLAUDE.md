@@ -150,7 +150,10 @@ any other way.
 intensity, population added, household size, area — nine census-derived — plus
 **Dealership**, a categorical layer colouring regions by the club covering them.
 
-**Dealership clusters** are a geographic level in every city, defined in
+**Dealership clusters** is a geographic level in every city. It draws two things:
+the dealership's **parent territory** (its census regions, shaded at 26% opacity,
+labelled with the dealership and its proposed fee) and its **premium cluster
+areas** highlighted on top at full opacity with a light outline. Defined in
 `dealership_clusters.json` (hand-edited; a commercial grouping, not a census
 unit, and carrying no fee). Area names resolve to outlines by **prefix-anchored**
 match — `E-7` must not swallow "Bahria Town Phase 7" — searching `city_areas`,
@@ -160,6 +163,9 @@ drawn twice. **Tehsil layers are excluded deliberately:** "Lahore Cantt" and
 matching the tehsil would draw an administrative unit as the cluster area.
 43 of 61 named areas have an outline; the other 18 are listed greyed and never
 approximated.
+
+Map labels are collision-filtered in screen space under the live zoom, so
+zooming reveals more. The pass re-runs 140ms after the zoom settles.
 
 **Export:** the panel has a Download CSV button. It exports exactly what is on
 screen — current city, level and year, one row per drawn shape — with every

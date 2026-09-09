@@ -39,10 +39,11 @@ often serve the cached copy.
   column plus the boundary-accuracy gap and its reason.
 - **Collapsible panels** — drawer handles at the map edges, or `[` and `]`, or
   `f` to hide both for presenting. The map re-fits into the space.
-- **Dealership clusters** — a geographic level in every city, drawing the named
-  areas in each dealership's cluster, coloured by dealership. There is also a
-  **Dealership** data layer that colours whole census regions by the dealership
-  covering them.
+- **Dealership clusters** — a geographic level in every city. Each dealership's
+  **parent territory** (the census regions it covers) is shaded in its colour,
+  with its **premium cluster areas highlighted** on top. The parent carries the
+  dealership name and proposed fee; each highlight carries its area name. There
+  is also a **Dealership** data layer colouring whole regions by club.
 
 Select a territory and drop a level and the map **enlarges that territory** —
 this is how you get from Karachi South down to Clifton and Defence. The

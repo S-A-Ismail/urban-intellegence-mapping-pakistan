@@ -316,24 +316,47 @@ const CLUB_COLOR={"KHI-1":"#e2683c","KHI-2":"#f0a94e","KHI-3":"#dfd97a",
  "KHI-4":"#9fc78e","LHE-1":"#5aa8a0","LHE-2":"#2a8296","LHE-3":"#1c5c78",
  "MUX-1":"#a98fd8","PEW-1":"#d47fb0","ISB-1":"#6f9fd8"};
 function clustersOf(city){return CLUSTERS.filter(c=>c.city===city);}
+
+/* The polygons that make up a dealership's parent territory — the census
+   regions it covers — so the clusters view shows the whole area a dealership
+   holds, with its premium pockets picked out inside it. */
+function regionLayerFor(city){
+  const ls=LEVELS[city]||[];
+  const l=ls.find(x=>x.join==="region")||ls.find(x=>x.join==="city");
+  return l?l.geo:null;
+}
 function clusterFeatures(city){
-  const out=[],seen={};
+  const out=[];
+  // 1. parent territories underneath
+  const layer=regionLayerFor(city), fc=layer?GEO[layer]:null;
+  const cityClubs=[...new Set(Object.values(REG).filter(r=>r.city===city)
+                    .map(r=>r.club).filter(Boolean))];
+  if(fc) fc.features.forEach(ft=>{
+    const nm=ft.properties.name;
+    // a whole-city polygon (Islamabad) carries no region name, so fall back to
+    // the city's single club rather than dropping it
+    const club=(REG[nm]&&REG[nm].club)||(cityClubs.length===1?cityClubs[0]:null);
+    if(!club) return;
+    const c=CLUSTERS.find(x=>x.code===club);
+    out.push({type:"Feature",geometry:ft.geometry,
+      properties:Object.assign({},ft.properties,
+        {_club:club,_clubName:c?c.name:"",_parent:true})});
+  });
+  // 2. premium cluster areas highlighted on top
+  const seen={};
   clustersOf(city).forEach(c=>c.areas.forEach(a=>a.found.forEach(fd=>{
     const key=fd.layer+"|"+fd.name;
     if(seen[key]) return; seen[key]=1;
-    const fc=GEO[fd.layer]; if(!fc) return;
-    const ft=fc.features.find(x=>x.properties.name===fd.name &&
+    const g=GEO[fd.layer]; if(!g) return;
+    const ft=g.features.find(x=>x.properties.name===fd.name &&
       (!x.properties.city||x.properties.city===city));
     if(!ft) return;
     out.push({type:"Feature",geometry:ft.geometry,
       properties:Object.assign({},ft.properties,
-        {_club:c.code,_clubName:c.name,_area:a.label,_layer:fd.layer})});
+        {_club:c.code,_clubName:c.name,_area:a.label,_layer:fd.layer,_premium:true})});
   })));
   return out;
 }
-const LVKIND={crosswalk:"crosswalked from an older layer",
-  source:"drawn by a different open source",match:"names and geometry correspond",
-  vintage:"a different administrative vintage"};
 
 /* ================= state =========================================
    `focus` is the territory the view is zoomed into. Selecting Karachi South and
@@ -376,8 +399,14 @@ function datum(f){
   }
   if(L.join==="cluster"){
     const c=CLUSTERS.find(x=>x.code===p._club);
+    const fee=c?c.proposed_fee_pkr:null;
+    if(p._parent){
+      const r=REG[n]?resolve(REG[n],S.year):cityRec(S.city,S.year);
+      return Object.assign({},r||{},{club:p._club,clubName:p._clubName,
+        fee:fee,_cluster:true,_parentArea:true});
+    }
     return {club:p._club,clubName:p._clubName,area:p.area_km2,_area:p._area,
-            fee:c?c.proposed_fee_pkr:null,_cluster:true};
+            fee:fee,_cluster:true};
   }
   return null;
 }
@@ -386,7 +415,7 @@ function datum(f){
 const svg=d3.select("#map"), gRoot=svg.append("g");
 const gCtx=gRoot.append("g"), gFill=gRoot.append("g"), gLine=gRoot.append("g"),
       gPt=gRoot.append("g"), gLab=gRoot.append("g");
-let W=0,H=0,proj,path,labelsAlways=false,shapesOnly=false;
+let W=0,H=0,proj,path,labelsAlways=false,shapesOnly=false,relabel=null;
 const RAMP=["#12202e","#173c55","#1c5c78","#2a8296","#5aa8a0","#9fc78e","#dfd97a","#f0a94e","#e2683c"];
 const scale=d3.scaleSequential(t=>d3.interpolateRgbBasis(RAMP)(t));
 function size(){const r=document.getElementById("stage").getBoundingClientRect();
@@ -399,6 +428,9 @@ const zoom=d3.zoom().scaleExtent([1,140]).on("zoom",e=>{
   gLab.attr("opacity",labelsAlways?.9:
         e.transform.k>2.2?1:e.transform.k>1.3?.72:0)
       .selectAll("text").attr("font-size",(10.5/Math.pow(e.transform.k,.72))+"px");
+  // re-run the label collision once the user stops, so zooming reveals more
+  clearTimeout(relabel);
+  relabel=setTimeout(()=>{if(proj) draw(false);},140);
 });
 svg.call(zoom);
 function fit(fc,pad=26){
@@ -416,7 +448,9 @@ function tween(fc,pad=26){
       gFill.selectAll("path").attr("d",path); gLine.selectAll("path").attr("d",path);
       gPt.selectAll("circle").attr("cx",d=>proj(d.geometry.coordinates)[0])
          .attr("cy",d=>proj(d.geometry.coordinates)[1]);
-      gLab.selectAll("text").attr("x",d=>path.centroid(d)[0]).attr("y",d=>path.centroid(d)[1]);
+      gLab.selectAll("text")
+          .attr("x",d=>path.centroid(d.geo)[0]).attr("y",d=>path.centroid(d.geo)[1])
+        .selectAll("tspan").attr("x",d=>path.centroid(d.geo)[0]);
     });}
   svg.transition().duration(680).call(zoom.transform,d3.zoomIdentity);
 }
@@ -491,9 +525,11 @@ function draw(recentre){
     .attr("d",path)
     .attr("fill",f=>{const m=datum(f);const v=m?L.acc(m):null;
       if(f.properties._club) return CLUB_COLOR[f.properties._club]||"#1b2837";
+      // (opacity below separates parent territory from premium cluster)
       if(L.cat) return v==null?"#16202c":(CLUB_COLOR[v]||"#3a4a5c");
       if(shapesOnly) return (m&&m._enclave)?"#8a6a24":"#1b2837";
       return (v==null||isNaN(v))?"#16202c":scale(v);})
+    .attr("fill-opacity",f=>f.properties._parent?0.26:1)
     .attr("stroke","none")
     .style("cursor","pointer")
     .on("mousemove",(ev,f)=>{
@@ -505,8 +541,12 @@ function draw(recentre){
       else if(m&&m._enclave)
         x=`Part of <b>${m._terr}</b>. This outline covers ${m.geo_cover||0}% of `
          +`the enclave's ${km2(m.area)}; the rest has no open boundary.`;
+      else if(m&&m._parentArea)
+        x=`Parent territory of <b>${m.club} ${m.clubName}</b>`
+         +(m.fee!=null?`, proposed ${money(m.fee)}`:"")+`.`;
       else if(m&&m._cluster)
-        x=`In the <b>${m._area}</b> cluster area of ${m.club}. The census `
+        x=`Premium cluster area <b>${m._area}</b>, inside ${m.club} `
+         +`${m.clubName}. The census `
          +`publishes no statistics at this level.`
          +(p._layer==="lahore_localities"
            ? ` This outline is a Voronoi cell around a locality point, not a`
@@ -524,8 +564,11 @@ function draw(recentre){
   ln.exit().remove();
   ln.enter().append("path").merge(ln)
     .attr("d",path).attr("fill","none")
-    .attr("stroke",f=>f.properties.name===S.sel?"#ffffff":"#0b0f14")
-    .attr("stroke-width",f=>f.properties.name===S.sel?2:.85)
+    .attr("stroke",f=>f.properties.name===S.sel?"#ffffff"
+      :f.properties._premium?"#f2f6fa"
+      :f.properties._parent?"#54687d":"#0b0f14")
+    .attr("stroke-width",f=>f.properties.name===S.sel?2
+      :f.properties._premium?1.1:.85)
     .attr("pointer-events","none");
 
   // Labels: only what is actually on screen, largest first. Keying this off the
@@ -539,19 +582,88 @@ function draw(recentre){
       c[0]>=bb[0][0]-mx && c[0]<=bb[1][0]+mx &&
       c[1]>=bb[0][1]-my && c[1]<=bb[1][1]+my;};
   const vis=fs.filter(inView);
-  const big=vis.slice().sort((a,b)=>(b.properties.area_km2||0)-(a.properties.area_km2||0))
-                .slice(0,34);
-  // `big` is already capped at a readable number, so show it. The zoom-based
-  // fade only earns its keep on dense unfocused layers.
-  labelsAlways = !!S.focus || vis.length<=34;
-  const lab=gLab.selectAll("text").data(big,(f,i)=>(f.properties.name||"")+i);
+
+  // On the clusters level the outline names are the wrong thing to show —
+  // "Clifton Block 5" nine times over never says "Clifton", and never says which
+  // dealership it belongs to. So group the outlines by cluster area and label
+  // each group once: the area name, then the dealership under it.
+  let labels;
+  if(lv.join==="cluster"){
+    const grp={};
+    vis.forEach(f=>{const k=f.properties._club+" "+f.properties._area;
+      (grp[k]=grp[k]||[]).push(f);});
+    labels=Object.values(grp).map(g=>{
+      // anchor on the member nearest the group's mean centre, so the label sits
+      // inside the cluster rather than on whichever piece happens to be biggest
+      const cs=g.map(f=>d3.geoCentroid(f));
+      const mx2=d3.mean(cs,c=>c[0]), my2=d3.mean(cs,c=>c[1]);
+      let best=g[0], bd=Infinity;
+      g.forEach((f,i)=>{const d=(cs[i][0]-mx2)**2+(cs[i][1]-my2)**2;
+        if(d<bd){bd=d;best=f;}});
+      const bp=best.properties;
+      const c=CLUSTERS.find(x=>x.code===bp._club);
+      if(bp._parent)   // the dealership's own territory
+        return {geo:best, key:"P|"+bp._club, text:bp._club+(c?" "+c.name:""),
+                sub:c&&c.proposed_fee_pkr!=null?money(c.proposed_fee_pkr):null,
+                club:bp._club, parent:true};
+      return {geo:best, key:bp._club+"|"+bp._area, text:bp._area,
+              sub:bp._club+(c?" "+c.name:""), club:bp._club};
+    });
+    labelsAlways=true;
+  }else{
+    labels=vis.slice()
+      .sort((a,b)=>(b.properties.area_km2||0)-(a.properties.area_km2||0))
+      .slice(0,34)
+      .map(f=>({geo:f,key:(f.properties.name||"")+(f.properties.city||""),
+                text:f.properties.name||"",sub:null,club:null}));
+    // already capped at a readable number, so show it; the zoom-based fade only
+    // earns its keep on dense unfocused layers
+    labelsAlways = !!S.focus || vis.length<=34;
+  }
+
+  // Drop labels that would sit on top of each other, biggest shape first. Laid
+  // out against a projection fitted to the destination, because during a fly-to
+  // `path` still holds the previous view and every box would be in the wrong
+  // place.
+  const fpath=d3.geoPath(d3.geoMercator().fitExtent([[pad,pad],[W-pad,H-pad]],fitc));
+  // Tested in screen space under the live zoom. Positions spread with k while
+  // the zoom handler only grows text by k^0.28, so zooming in genuinely makes
+  // room and more labels appear. A recentring draw lands on identity.
+  const tr = recentre ? d3.zoomIdentity : d3.zoomTransform(svg.node());
+  const sc = Math.pow(tr.k, 0.28);
+  const gArea=d=>d.geo.properties.area_km2||0;
+  const placed=[];
+  labels=labels.sort((a,b)=>(b.parent?1:0)-(a.parent?1:0)||gArea(b)-gArea(a))
+    .filter(d=>{
+    const c0=fpath.centroid(d.geo);
+    if(!c0||isNaN(c0[0])) return false;
+    const x=c0[0]*tr.k+tr.x, y=c0[1]*tr.k+tr.y;
+    if(x<-60||x>W+60||y<-40||y>H+40) return false;      // off screen
+    const w=(Math.max(d.text.length*5.9,(d.sub||"").length*4.9)+8)*sc,
+          h=(d.sub?24:14)*sc;
+    const b=[x-w/2,y-h/2,x+w/2,y+h/2];
+    if(placed.some(q=>b[0]<q[2]&&b[2]>q[0]&&b[1]<q[3]&&b[3]>q[1])) return false;
+    placed.push(b); return true;
+  });
+
+  const lab=gLab.selectAll("text").data(labels,d=>d.key);
   lab.exit().remove();
-  lab.enter().append("text").merge(lab)
-    .attr("x",f=>path.centroid(f)[0]).attr("y",f=>path.centroid(f)[1])
-    .attr("text-anchor","middle").attr("fill","#dbe6f0")
-    .attr("font-size","10.5px").attr("pointer-events","none")
-    .attr("paint-order","stroke").attr("stroke","#0b0f14").attr("stroke-width",2.4)
-    .text(f=>f.properties.name||"");
+  const labAll=lab.enter().append("text")
+      .attr("text-anchor","middle").attr("pointer-events","none")
+      .attr("paint-order","stroke").attr("stroke","#0b0f14").attr("stroke-width",2.4)
+    .merge(lab)
+      .attr("x",d=>path.centroid(d.geo)[0]).attr("y",d=>path.centroid(d.geo)[1])
+      .attr("fill",d=>d.parent?(CLUB_COLOR[d.club]||"#e6edf3"):"#e6edf3")
+      .attr("font-size",d=>d.parent?"12px":"10.5px")
+      .attr("font-weight",d=>d.sub?600:400)
+      .attr("letter-spacing",d=>d.parent?".4px":null);
+  labAll.selectAll("tspan").remove();
+  labAll.append("tspan").attr("x",d=>path.centroid(d.geo)[0]).text(d=>d.text);
+  labAll.filter(d=>d.sub).append("tspan")
+      .attr("x",d=>path.centroid(d.geo)[0]).attr("dy","1.15em")
+      .attr("font-size",".82em").attr("font-weight",400)
+      .attr("fill",d=>d.parent?"#8b9bab":(CLUB_COLOR[d.club]||"#8b9bab"))
+      .text(d=>d.sub);
   gLab.attr("opacity",labelsAlways?.9:fs.length>40?0:.8);
 
   // city markers on the national view
@@ -599,8 +711,9 @@ function drawLegend(){
       .text(x=>x);
     d3.select("#lnote").html(`<span class="pill p-der">Derived</span> `
       +(clusterView
-        ? `The named areas in each dealership's cluster, coloured by dealership. `
-          +`Areas with no open outline are listed in the panel but cannot be drawn.`
+        ? `Each dealership's parent territory, shaded, with its premium cluster `
+          +`areas picked out on top. Areas with no open outline are listed in the `
+          +`panel but cannot be drawn.`
         : `Each region coloured by the dealership covering it.`));
     d3.select("#yearflag").html(S.year==="2023"
       ? `<b>2023</b> census — official` : `<b>2026</b> projected — derived`);
