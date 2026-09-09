@@ -151,7 +151,11 @@ button.dl:hover{background:rgba(78,161,255,.13);border-color:rgba(78,161,255,.34
   <div class="brand"><h1>PAKISTAN URBAN<br/>INTELLIGENCE MAP</h1>
    <div class="s" id="brandsub">Census 2023 · five cities</div></div>
   <div class="grp"><h2>City</h2><div id="c-city"></div></div>
-  <div class="grp"><h2>Geographic level</h2><div id="c-level"></div></div>
+  <div class="grp"><h2>Geographic level</h2><div id="c-level"></div>
+   <div id="g-names" hidden><h2 style="margin-top:11px">Region names</h2>
+    <div class="seg" id="c-names"></div>
+    <div class="hint" style="margin-top:7px">Every area in each cluster is listed
+    in the panel, so the map shows only the dealership by default.</div></div></div>
   <div class="grp"><h2>Year</h2><div class="seg" id="c-year"></div>
    <div class="hint" id="yearhint" style="margin-top:7px"></div></div>
   <div class="grp"><h2>Data layer</h2><div id="c-layer"></div></div>
@@ -363,7 +367,9 @@ function clusterFeatures(city){
    dropping to neighbourhoods keeps it as the focus, so the map enlarges that
    district instead of showing all 454 areas at city scale. */
 let S={city:"Pakistan",level:"cities",layer:"population",year:"2026",
-       sel:null,focus:null};
+       sel:null,focus:null,regionNames:false};
+try{const v=localStorage.getItem("pum.regionNames");
+    if(v!=null) S.regionNames=(v==="1");}catch(e){}
 function focusFeature(){
   if(!S.focus) return null;
   for(const l of levels()){
@@ -471,7 +477,6 @@ function showTip(ev,name,sub,m,extra){
     put("Density",    m.density!=null?dens(m.density):null);
     put("Dealership", m.club?(m.club+(m.clubName?" · "+m.clubName:"")):null);
     put("Cluster area", m._area||null);
-    put("Proposed fee", m.fee!=null?money(m.fee):null);
   }else{
     h+=`<div class="r"><span>No statistics at this level</span></div>`;
   }
@@ -542,8 +547,7 @@ function draw(recentre){
         x=`Part of <b>${m._terr}</b>. This outline covers ${m.geo_cover||0}% of `
          +`the enclave's ${km2(m.area)}; the rest has no open boundary.`;
       else if(m&&m._parentArea)
-        x=`Parent territory of <b>${m.club} ${m.clubName}</b>`
-         +(m.fee!=null?`, proposed ${money(m.fee)}`:"")+`.`;
+        x=`Parent territory of <b>${m.club} ${m.clubName}</b>.`;
       else if(m&&m._cluster)
         x=`Premium cluster area <b>${m._area}</b>, inside ${m.club} `
          +`${m.clubName}. The census `
@@ -590,9 +594,13 @@ function draw(recentre){
   let labels;
   if(lv.join==="cluster"){
     const grp={};
-    vis.forEach(f=>{const k=f.properties._club+" "+f.properties._area;
+    vis.forEach(f=>{const p=f.properties;
+      // The dealership always gets a label. The areas inside it are optional —
+      // the panel lists every one, so the map need not repeat them.
+      if(!p._parent && !S.regionNames) return;
+      const k=p._parent ? "P|"+p._club : "A|"+p._club+"|"+p._area;
       (grp[k]=grp[k]||[]).push(f);});
-    labels=Object.values(grp).map(g=>{
+    labels=Object.entries(grp).map(([gkey,g])=>{
       // anchor on the member nearest the group's mean centre, so the label sits
       // inside the cluster rather than on whichever piece happens to be biggest
       const cs=g.map(f=>d3.geoCentroid(f));
@@ -603,10 +611,9 @@ function draw(recentre){
       const bp=best.properties;
       const c=CLUSTERS.find(x=>x.code===bp._club);
       if(bp._parent)   // the dealership's own territory
-        return {geo:best, key:"P|"+bp._club, text:bp._club+(c?" "+c.name:""),
-                sub:c&&c.proposed_fee_pkr!=null?money(c.proposed_fee_pkr):null,
-                club:bp._club, parent:true};
-      return {geo:best, key:bp._club+"|"+bp._area, text:bp._area,
+        return {geo:best, key:gkey, text:bp._club+(c?" "+c.name:""),
+                sub:null, club:bp._club, parent:true};
+      return {geo:best, key:gkey, text:bp._area,
               sub:bp._club+(c?" "+c.name:""), club:bp._club};
     });
     labelsAlways=true;
@@ -642,6 +649,10 @@ function draw(recentre){
     const w=(Math.max(d.text.length*5.9,(d.sub||"").length*4.9)+8)*sc,
           h=(d.sub?24:14)*sc;
     const b=[x-w/2,y-h/2,x+w/2,y+h/2];
+    // A dealership label is the primary thing on this view and there are at most
+    // five per city, so it is never suppressed — a small overlap beats a
+    // territory going unnamed.
+    if(d.parent){placed.push(b); return true;}
     if(placed.some(q=>b[0]<q[2]&&b[2]>q[0]&&b[1]<q[3]&&b[3]>q[1])) return false;
     placed.push(b); return true;
   });
@@ -1009,6 +1020,17 @@ function drawControls(){
   ctl("#c-layer",Object.entries(LAYERS).map(([id,l])=>({id,label:l.label,
       off:l.disabled,sep:l.sep,tag:PROV[l.prov(S.year)][1]})),
     S.layer,id=>{S.layer=id;draw(false);});
+
+  const isC=lvl().join==="cluster";
+  document.getElementById("g-names").hidden=!isC;
+  if(isC){
+    const n=d3.select("#c-names").html("");
+    [["Cluster only",false],["Show all",true]].forEach(([lab,val])=>
+      n.append("button").attr("class",S.regionNames===val?"on":"").text(lab)
+       .on("click",()=>{S.regionNames=val;
+         try{localStorage.setItem("pum.regionNames",val?"1":"0");}catch(e){}
+         draw(false);}));
+  }
 
   const y=d3.select("#c-year").html("");
   YRS.forEach(v=>y.append("button").attr("class",v===S.year?"on":"")

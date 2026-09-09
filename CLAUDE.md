@@ -143,8 +143,8 @@ from Karachi South to Clifton and Defence.
 
 **Units in the UI:** standard units everywhere — grouped integers for counts,
 km² for area, /km² for density, % for rates. The single monetary figure, the
-proposed entry fee, uses PKR Lakh and Crore via `money()`. Do not format money
-any other way.
+proposed entry fee, uses PKR Lakh and Crore via `money()` — in the side panel and
+CSV only, never on the map itself. Do not format money any other way.
 
 **Layers:** population, density, growth, households, new households, new-housing
 intensity, population added, household size, area — nine census-derived — plus
@@ -152,8 +152,16 @@ intensity, population added, household size, area — nine census-derived — pl
 
 **Dealership clusters** is a geographic level in every city. It draws two things:
 the dealership's **parent territory** (its census regions, shaded at 26% opacity,
-labelled with the dealership and its proposed fee) and its **premium cluster
-areas** highlighted on top at full opacity with a light outline. Defined in
+labelled with the dealership) and its **premium cluster areas** highlighted on
+top at full opacity with a light outline.
+
+Map labels default to the dealership only — the panel already lists every area —
+and a **Region names** toggle (`S.regionNames`, persisted) adds the area labels.
+The dealership label is exempt from collision suppression: at most five per city,
+and a territory going unnamed is worse than a small overlap.
+
+**No price is drawn on the map.** The proposed fee lives in the side panel and
+the CSV column only. Defined in
 `dealership_clusters.json` (hand-edited; a commercial grouping, not a census
 unit, and carrying no fee). Area names resolve to outlines by **prefix-anchored**
 match — `E-7` must not swallow "Bahria Town Phase 7" — searching `city_areas`,
