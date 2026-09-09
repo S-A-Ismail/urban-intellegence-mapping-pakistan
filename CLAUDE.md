@@ -262,6 +262,25 @@ grid item and slide `#stage` into the collapsed column.
 | `_superseded/01–08` | Earlier drafts in build order. Keep. |
 | `charts/` | 12 chart PNGs, 170 dpi. |
 
+### Platform — branch `feature/urban-intelligence-mapping` only
+
+A design, not a build. Nothing on `main` depends on it and the current map is
+untouched. Read `docs/ARCHITECTURE.md` before working on that branch.
+
+| Path | Role |
+|---|---|
+| `docs/ARCHITECTURE.md` | Warehouse, 3D map app, Supabase + cPanel split. Start here. |
+| `docs/DATA_SOURCES.md` | Per-source legal basis and the privacy model. |
+| `docs/DEPLOYMENT_CPANEL.md` | Static hosting, PMTiles range serving, why the ETL runs elsewhere. |
+| `warehouse/schema/001–007` | Proposed DDL. **Never executed against a database.** |
+| `warehouse/sources/registry.yml` | Source registry; `enabled: false` is the legal gate. |
+| `etl/`, `app/`, `deploy/` | Contracts written, nothing implemented. |
+
+The load-bearing idea is §3, geographic identity: vintaged units, weighted
+crosswalks, and containment computed from geometry rather than asserted from
+names. Both Lahore's 5→10 tehsil break and Karachi's town-versus-taluka
+misalignment are consequences of not having it.
+
 ---
 
 ## Commands

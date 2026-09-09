@@ -1,0 +1,259 @@
+# Source registry
+#
+# The reviewable form of src.source. `etl/sync_registry.py` upserts this into
+# the table; the table is the enforcement point, this file is the audit trail.
+#
+# enabled: false is the default and it is not a formality. A connector refuses
+# to run against a disabled source. Enabling one requires license_ref and
+# enabled_by, enforced by a CHECK constraint (003_sources.sql), so "we'll sort
+# the licence out later" cannot quietly become "we shipped it".
+#
+# See docs/DATA_SOURCES.md for the reasoning behind each classification.
+
+sources:
+
+  # ---------------------------------------------------------------- census
+
+  - source_id: pbs_census_2023
+    name: Pakistan Census 2023 — digital census tables
+    publisher: Pakistan Bureau of Statistics
+    kind: census
+    legal_basis: public_domain
+    license_ref: https://www.pbs.gov.pk/
+    permits_storage: true
+    permits_redistribution: true
+    pii_class: none
+    min_geography: block
+    k_threshold: 1
+    refresh_cadence: null          # decennial; re-base every 3 years regardless
+    connector: connectors.pbs_census
+    enabled: true
+    enabled_by: seed
+    notes: >
+      Already the backbone of the existing model. Table 20 is Pakka / Semi-Pakka
+      / Kacha — construction material, NOT house versus apartment. No PBS table
+      publishes the house/flat split by district; an earlier draft claimed
+      otherwise and was wrong. The split remains an assumption.
+
+  - source_id: pbs_census_2017
+    name: Pakistan Census 2017
+    publisher: Pakistan Bureau of Statistics
+    kind: census
+    legal_basis: public_domain
+    license_ref: https://www.pbs.gov.pk/
+    permits_storage: true
+    permits_redistribution: true
+    pii_class: none
+    min_geography: block
+    connector: connectors.pbs_census
+    enabled: true
+    enabled_by: seed
+    notes: Prior census. Supplies the growth base and the replacement-due base.
+
+  # ------------------------------------------------------------ boundaries
+
+  - source_id: osm_boundaries
+    name: OpenStreetMap administrative boundaries
+    publisher: OpenStreetMap contributors
+    kind: authority
+    legal_basis: open_data
+    license_ref: https://opendatacommons.org/licenses/odbl/1-0/
+    permits_storage: true
+    permits_redistribution: true    # ODbL: attribution required, share-alike on derived DB
+    pii_class: none
+    refresh_cadence: 90 days
+    connector: connectors.osm_admin
+    enabled: true
+    enabled_by: seed
+    notes: >
+      ODbL is share-alike. Attribution must appear in the map UI, and a derived
+      boundary database redistributed outside the org carries the same licence.
+      Not a blocker for internal use; it is a blocker for shipping boundaries to
+      a client as proprietary data.
+
+  - source_id: punjab_bor_2024
+    name: Punjab Board of Revenue notification 1058-2024/4496
+    publisher: Board of Revenue, Punjab
+    kind: authority
+    legal_basis: public_domain
+    license_ref: Notification 1058-2024/4496, 27 Aug 2024
+    permits_storage: true
+    permits_redistribution: true
+    pii_class: none
+    enabled: true
+    enabled_by: seed
+    notes: >
+      The 363 revenue estates behind Lahore's ten post-2024 tehsils. Loads as a
+      separate vintage (valid_from 2024-08-27), never merged with the five
+      census tehsils.
+
+  # -------------------------------------------------- registry / electoral
+
+  - source_id: ecp_electoral_blocks
+    name: Electoral rolls — registered voter counts by block code
+    publisher: Election Commission of Pakistan
+    kind: registry
+    legal_basis: public_domain
+    license_ref: TBD — confirm the published aggregate series and its terms
+    permits_storage: true
+    permits_redistribution: false
+    pii_class: none                # aggregate counts only, never the roll itself
+    min_geography: block
+    k_threshold: 25
+    refresh_cadence: 365 days
+    connector: connectors.ecp_blocks
+    enabled: false
+    enabled_by: null
+    notes: >
+      Aggregate counts by census block code — the practical substitute for the
+      household-registry data the brief asks for. Joins to census block
+      geography directly. The individual electoral roll is out of scope and is
+      not to be ingested in any form.
+
+  - source_id: nadra_aggregate
+    name: NADRA published statistics (aggregate)
+    publisher: National Database and Registration Authority
+    kind: registry
+    legal_basis: restricted
+    license_ref: null
+    permits_storage: false
+    permits_redistribution: false
+    pii_class: none
+    min_geography: district
+    k_threshold: 100
+    connector: null
+    enabled: false
+    enabled_by: null
+    notes: >
+      NADRA does not provide bulk citizen or household data and the platform is
+      not designed around the assumption that it will. Only published aggregate
+      statistics are in scope, and only under a written arrangement. Anything
+      household-level would be direct PII, which permits_storage = false and the
+      source_pii_gate constraint both refuse. Keep this row disabled until
+      counsel signs off on a specific series.
+
+  # ----------------------------------------------------------- listings
+
+  - source_id: zameen_index
+    name: Zameen published market index (aggregate)
+    publisher: Zameen.com
+    kind: listings
+    legal_basis: restricted
+    license_ref: null
+    permits_storage: false
+    permits_redistribution: false
+    pii_class: none
+    min_geography: neighbourhood
+    k_threshold: 10
+    refresh_cadence: 30 days
+    connector: null
+    enabled: false
+    enabled_by: null
+    notes: >
+      Aggregate area-level price indices are published and are the usable form.
+      Bulk listing extraction is prohibited by the site terms; the route to
+      listing-level data is a licensed feed or a data partnership. The connector
+      interface is the same either way, so this row moves from index to feed
+      without touching silver or gold.
+
+  - source_id: olx_listings
+    name: OLX property listings
+    publisher: OLX Pakistan
+    kind: listings
+    legal_basis: restricted
+    license_ref: null
+    permits_storage: false
+    permits_redistribution: false
+    pii_class: indirect            # listings carry seller contact details
+    min_geography: neighbourhood
+    k_threshold: 10
+    connector: null
+    enabled: false
+    enabled_by: null
+    notes: >
+      No bulk API; terms prohibit scraping. Listings also carry seller phone
+      numbers and names — indirect PII that must be dropped at silver even if a
+      feed is licensed. Only price, area, type, bedrooms and location are
+      wanted; contact details are never persisted.
+
+  # --------------------------------------------------------------- POI
+
+  - source_id: google_places
+    name: Google Places
+    publisher: Google
+    kind: poi
+    legal_basis: licensed
+    license_ref: null              # Google Maps Platform terms + billing account
+    permits_storage: true          # limited: see retention_days
+    permits_redistribution: false
+    retention_days: 30
+    pii_class: none
+    min_geography: neighbourhood
+    refresh_cadence: 30 days
+    connector: null
+    enabled: false
+    enabled_by: null
+    notes: >
+      Maps Platform terms restrict caching of Places content. Modelled as a
+      short retention on bronze plus derived aggregates in gold that survive the
+      purge, so the warehouse keeps "cafes per km2" without keeping Google's
+      content. Confirm the current terms before enabling; they change.
+
+  # ------------------------------------------------- authority / utility
+
+  - source_id: building_approvals
+    name: Building approvals — SBCA / LDA / CDA / PDA / MDA
+    publisher: Provincial and city building control authorities
+    kind: authority
+    legal_basis: contract
+    license_ref: null
+    permits_storage: true
+    permits_redistribution: false
+    pii_class: indirect            # applicant names on approvals
+    min_geography: neighbourhood
+    connector: null
+    enabled: false
+    enabled_by: null
+    notes: >
+      The highest-value missing input. Would replace the house-versus-flat share
+      assumption, which currently carries the largest blast radius in the model.
+      Applicant identities are dropped at silver; only counts, type and location
+      are wanted.
+
+  - source_id: utility_connections
+    name: Domestic utility connections by block (house vs bulk meters)
+    publisher: KE / SSGC / LESCO / SNGPL
+    kind: utility
+    legal_basis: contract
+    license_ref: null
+    permits_storage: true
+    permits_redistribution: false
+    pii_class: indirect            # connection records identify premises
+    min_geography: block
+    k_threshold: 25
+    connector: null
+    enabled: false
+    enabled_by: null
+    notes: >
+      Faster route to the house/flat split than building approvals: a bulk meter
+      implies a building, a domestic meter a house. Request aggregate counts by
+      block, never the connection register.
+
+  # ------------------------------------------------------------ internal
+
+  - source_id: internal_model
+    name: Dealership model workbook
+    publisher: Cenergy
+    kind: internal
+    legal_basis: internal
+    license_ref: internal
+    permits_storage: true
+    permits_redistribution: false
+    pii_class: none
+    connector: connectors.model_xlsx
+    enabled: true
+    enabled_by: seed
+    notes: >
+      Dealership_Model.xlsx stays the source of truth for the fee model. It
+      publishes into gold with sensitivity = 'commercial', so RLS keeps it out
+      of any client that is not entitled to it.

@@ -1,0 +1,30 @@
+---
+# cPanel Git Version Control deployment.
+#
+# cPanel does NOT build. It checks out the branch and runs these tasks, so
+# app/dist/ must already exist in the deployed branch — either committed on a
+# dedicated deploy branch, or pushed there by CI. Keep built assets out of main.
+#
+# DEPLOYPATH must be an absolute path on the host. Replace <cpaneluser>.
+#
+# Tiles are deliberately NOT copied here. They are large, they change on a
+# different cadence from the app, and re-uploading hundreds of megabytes on
+# every code deploy is a waste. Upload them once with rsync or the File Manager
+# and leave them alone.
+
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home/<cpaneluser>/public_html
+
+    # App bundle.
+    - /bin/mkdir -p $DEPLOYPATH
+    - /bin/cp -R app/dist/. $DEPLOYPATH/
+
+    # Server config.
+    - /bin/cp deploy/htaccess.template $DEPLOYPATH/.htaccess
+
+    # Backstop: nothing from the warehouse or ETL belongs under public_html.
+    - /bin/rm -rf $DEPLOYPATH/warehouse $DEPLOYPATH/etl $DEPLOYPATH/docs
+    - /bin/find $DEPLOYPATH -maxdepth 1 -name '*.env' -delete
+
+    - /bin/echo "deployed $(date -u +%FT%TZ)" > $DEPLOYPATH/BUILD

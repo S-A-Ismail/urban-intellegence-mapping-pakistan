@@ -1,0 +1,78 @@
+# cPanel .htaccess for the Urban Intelligence SPA
+# Copy to public_html/.htaccess. See docs/DEPLOYMENT_CPANEL.md.
+
+Options -Indexes
+DirectoryIndex index.html
+
+# ---------------------------------------------------------------- MIME
+<IfModule mod_mime.c>
+  AddType application/octet-stream .pmtiles
+  AddType application/vnd.mapbox-vector-tile .mvt .pbf
+  AddType application/wasm .wasm
+  AddType application/json .json .geojson
+</IfModule>
+
+# ------------------------------------------------------------ ranges
+# PMTiles reads a large file by byte offset. Compressing the response makes
+# those offsets meaningless and the map fails to decode tiles with no useful
+# error. This block is the single most important thing in this file.
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/css text/plain application/javascript application/json image/svg+xml
+  SetEnvIfNoCase Request_URI \.pmtiles$ no-gzip dont-vary
+  SetEnvIfNoCase Request_URI \.(?:png|jpe?g|webp|avif|woff2?)$ no-gzip dont-vary
+</IfModule>
+
+<IfModule mod_headers.c>
+  <FilesMatch "\.pmtiles$">
+    Header set Accept-Ranges bytes
+    Header unset Content-Encoding
+    # Content-addressed by the build, so it never changes under a given name.
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+
+  # Hashed assets: immutable. index.html: never cached, it names the hashes.
+  <FilesMatch "\.[0-9a-f]{8,}\.(js|css|woff2)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+  <FilesMatch "^(index\.html|manifest\.webmanifest)$">
+    Header set Cache-Control "no-cache, must-revalidate"
+  </FilesMatch>
+
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set X-Frame-Options "SAMEORIGIN"
+</IfModule>
+
+# ------------------------------------------------------------- secrets
+# Backstop only. Nothing sensitive should be in public_html in the first place.
+<FilesMatch "^\.|(\.env|\.map|\.sql|\.yml|\.yaml|\.py)$">
+  Require all denied
+</FilesMatch>
+
+# ---------------------------------------------------------- SPA routing
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Force HTTPS.
+  RewriteCond %{HTTPS} !=on
+  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+  # Real files and directories are served as-is — tiles included.
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # Everything else is a client route.
+  RewriteRule ^ index.html [L]
+</IfModule>
+
+# ---------------------------------------------------------------- notes
+# LiteSpeed (which most cPanel hosts now run) honours this file, but its own
+# cache module sits above the rewrite layer and can re-add compression. If a
+# ranged request for a .pmtiles file returns 200 instead of 206, disable
+# LiteSpeed cache for /tiles before investigating anything else:
+#
+#   curl -sI -H "Range: bytes=0-99" https://example.com/tiles/karachi.pmtiles
+#
+# Expect: 206 Partial Content, Content-Length: 100, Accept-Ranges: bytes.

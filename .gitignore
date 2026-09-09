@@ -12,3 +12,15 @@ venv/
 
 # excel lock files
 ~$*.xlsx
+
+# app build (feature/urban-intelligence-mapping)
+node_modules/
+app/dist/
+app/.vite/
+.env
+.env.*
+!.env.example
+
+# generated tiles — large, rebuilt by ETL, never committed
+*.pmtiles
+tiles/
