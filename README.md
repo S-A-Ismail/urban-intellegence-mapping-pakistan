@@ -65,11 +65,13 @@ separated territories is labelled on each of them: LHE-1 appears twice, on
 Lahore Cantt and on Raiwind, while territories that touch are labelled once
 between them.
 
-Lahore's dealerships follow Karachi's convention of naming the territories they
-cover: **LHE-1 Cantt & Raiwind**, **LHE-2 City & Shalimar**, **LHE-3 Model
-Town**. The codes are unchanged. Edit the `name` field in
-`dealership_clusters.json` to change them; it overrides the DealerStructure
-label everywhere.
+Lahore's dealerships are **LHE-1 Cantt & Shalimar**, **LHE-2 City & Raiwind**
+(Rs 1.25 Cr each) and **LHE-3 Model Town** (Rs 1.00 Cr). That pairing differs
+from the workbook's, and comes from the `regions` list in
+`dealership_clusters.json`, which overrides the sheet. Enclaves follow their
+parent region and the territory counts are recomputed to match, so nothing is
+left pointing at the old grouping. Edit `name`, `regions` or
+`proposed_fee_pkr` there to change any of it.
 
 Select a territory and drop a level and the map **enlarges that territory** —
 this is how you get from Karachi South down to Clifton and Defence. The

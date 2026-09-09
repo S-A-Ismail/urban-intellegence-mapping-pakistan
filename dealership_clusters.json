@@ -12,7 +12,14 @@
     "refresh.py reports coverage on every run. Add a prefix here to link an area",
     "once an outline for it exists.",
     "",
-    "proposed_fee_pkr is the client's own two-tier proposal (Rs 1.5 Cr / Rs 1 Cr),",
+    "proposed_fee_pkr is the client's own proposal, entered by hand.",
+    "",
+    "\"regions\" names the census regions a dealership covers, and overrides the",
+    "assignment in the workbook. Lahore uses it: the model sheet pairs Cantt with",
+    "Raiwind and City with Shalimar, the scheme here pairs Cantt with Shalimar and",
+    "City with Raiwind. Hyper markets follow their parent region, and the",
+    "territory counts shown are recomputed from this, not read from",
+    "DealerStructure.",
     "entered by hand. It is NOT the model's derived fee schedule and is labelled",
     "'proposed' everywhere it appears. Nothing else commercial is carried: no",
     "quota, pump point, revenue, profit or payback figure is read from the",
@@ -64,31 +71,15 @@
       ]
     },
     {
-      "code": "LHE-1", "proposed_fee_pkr": 15000000, "name": "Cantt & Raiwind", "city": "Lahore",
+      "code": "LHE-1", "proposed_fee_pkr": 12500000, "name": "Cantt & Shalimar", "city": "Lahore",
+      "regions": ["Lahore Cantt", "Shalimar"],
       "premium": true,
+      "note": "The DHA / Cavalry / Walton belt in Lahore Cantt is the premium cluster. The Shalimar names below are representative localities, not a premium grouping.",
       "areas": [
         {"label": "DHA Lahore I-VI", "prefixes": ["DHA Phase 1", "DHA Phase 2", "DHA Phase 3", "DHA Phase 4", "DHA Phase 5", "DHA Phase 6"]},
-        {"label": "DHA Lahore VII-IX", "prefixes": ["DHA Phase 7", "DHA Phase 8", "DHA Phase 9"]},
         {"label": "Cavalry Ground", "prefixes": ["Cavalry Ground"]},
         {"label": "Lahore Cantt", "prefixes": ["Lahore Cantonment", "Lahore Cantt"]},
         {"label": "Walton Cantt", "prefixes": ["Walton"]},
-        {"label": "EME Society", "prefixes": ["EME Society", "EME"]},
-        {"label": "Bahria Town Lahore", "prefixes": ["Bahria Town"]},
-        {"label": "Lake City", "prefixes": ["Lake City"]}
-      ]
-    },
-    {
-      "code": "LHE-2", "proposed_fee_pkr": 10000000, "name": "City & Shalimar", "city": "Lahore",
-      "premium": false,
-      "note": "No designated premium cluster. The areas below are representative localities in the central tehsils, taken from the Lahore locality layer — not a premium grouping.",
-      "areas": [
-        {"label": "Samanabad", "prefixes": ["Samanabad"]},
-        {"label": "Shadman", "prefixes": ["Shadman"]},
-        {"label": "Mozang", "prefixes": ["Mozang"]},
-        {"label": "Krishan Nagar", "prefixes": ["Krishan Nagar"]},
-        {"label": "Islampura", "prefixes": ["Islampura"]},
-        {"label": "Sanda", "prefixes": ["Sanda"]},
-        {"label": "Gulshan-e-Ravi", "prefixes": ["Gulshan-e-Ravi", "Gulshan e Ravi"]},
         {"label": "Garhi Shahu", "prefixes": ["Garhi Shahu"]},
         {"label": "Misri Shah", "prefixes": ["Misri Shah"]},
         {"label": "Baghbanpura", "prefixes": ["Baghbanpura"]},
@@ -97,7 +88,27 @@
       ]
     },
     {
+      "code": "LHE-2", "proposed_fee_pkr": 12500000, "name": "City & Raiwind", "city": "Lahore",
+      "regions": ["Lahore City", "Raiwind"],
+      "premium": true,
+      "note": "The DHA VII-IX / Bahria / Lake City belt in Raiwind is the premium cluster. The Lahore City names below are representative localities, not a premium grouping.",
+      "areas": [
+        {"label": "DHA Lahore VII-IX", "prefixes": ["DHA Phase 7", "DHA Phase 8", "DHA Phase 9"]},
+        {"label": "EME Society", "prefixes": ["EME Society", "EME"]},
+        {"label": "Bahria Town Lahore", "prefixes": ["Bahria Town"]},
+        {"label": "Lake City", "prefixes": ["Lake City"]},
+        {"label": "Samanabad", "prefixes": ["Samanabad"]},
+        {"label": "Shadman", "prefixes": ["Shadman"]},
+        {"label": "Mozang", "prefixes": ["Mozang"]},
+        {"label": "Krishan Nagar", "prefixes": ["Krishan Nagar"]},
+        {"label": "Islampura", "prefixes": ["Islampura"]},
+        {"label": "Sanda", "prefixes": ["Sanda"]},
+        {"label": "Gulshan-e-Ravi", "prefixes": ["Gulshan-e-Ravi", "Gulshan e Ravi"]}
+      ]
+    },
+    {
       "code": "LHE-3", "proposed_fee_pkr": 10000000, "name": "Model Town", "city": "Lahore",
+      "regions": ["Model Town"],
       "premium": true,
       "areas": [
         {"label": "Gulberg I-V", "prefixes": ["Gulberg"]},

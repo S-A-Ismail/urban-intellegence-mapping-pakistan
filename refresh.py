@@ -370,6 +370,34 @@ if os.path.exists(p("dealership_clusters.json")):
                              proposed_fee_pkr=c.get("proposed_fee_pkr"),
                              areas=areas))
     net = sum(c.get("proposed_fee_pkr") or 0 for c in CLUSTERS)
+    # A cluster may reassign which census regions it covers. The workbook's own
+    # pairing is the default; "regions" here overrides it, and the map follows
+    # the scheme. Lahore uses this: the sheet pairs Cantt with Raiwind and City
+    # with Shalimar, the scheme pairs Cantt with Shalimar and City with Raiwind.
+    moved = []
+    for c in scheme.get("clusters", []):
+        for rname in c.get("regions") or []:
+            r = REGIONS.get(rname)
+            if r and r.get("club") != c["code"]:
+                moved.append("%s %s -> %s" % (rname, r.get("club"), c["code"]))
+                r["club"] = c["code"]
+    # a carved-out enclave belongs to whoever holds its parent region
+    for h in HYPER.values():
+        par = h.get("parent")
+        if par in REGIONS and REGIONS[par].get("club"):
+            h["club"] = REGIONS[par]["club"]
+    # and the territory counts follow the effective assignment, not the sheet's
+    counts = {}
+    for rec in list(REGIONS.values()) + list(HYPER.values()):
+        if rec.get("club"):
+            counts[rec["club"]] = counts.get(rec["club"], 0) + 1
+    for code, d in DEALERS.items():
+        if code in counts:
+            d["territories"] = counts[code]
+    if moved:
+        print("· cluster scheme reassigns %d region(s): %s"
+              % (len(moved), "; ".join(moved)))
+
     print("· clusters: %d dealerships, %d named areas, %d with an outline"
           % (len(CLUSTERS), total_areas, total_drawn))
     if net:

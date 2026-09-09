@@ -216,14 +216,32 @@ They are white, bold (700) on a heavy dark halo, sized from `LBL_P` (dealership)
 and `LBL_A` (area); the zoom handler scales each from its own base, or zooming
 flattens the two to one size.
 
-**Dealership names** come from `dealership_clusters.json`, which `refresh.py`
-copies over the DealerStructure labels so the cluster card, the structure card
-and the selection detail cannot disagree. Lahore was renamed to Karachi's
-convention of naming the territories covered — LHE-1 *Cantt & Raiwind*, LHE-2
-*City & Shalimar*, LHE-3 *Model Town* — replacing compass names that repeated
-the city and, in LHE-3's case, pointed the wrong way: "West Lahore" was the
-Model Town tehsil in the centre-south. The **codes are unchanged**, so anything
-contractual keyed on LHE-1/2/3 still matches.
+**Dealership names and composition** come from `dealership_clusters.json`.
+`refresh.py` copies the name over the DealerStructure label so the cluster card,
+the structure card and the selection detail cannot disagree, and a cluster's
+optional `regions` list **overrides the workbook's own club assignment**.
+
+Lahore uses that override. The sheet pairs Cantt with Raiwind and City with
+Shalimar; the scheme pairs them the other way:
+
+| | Covers | Proposed fee |
+|---|---|---|
+| LHE-1 Cantt & Shalimar | Lahore Cantt, Shalimar | Rs 1.25 Cr |
+| LHE-2 City & Raiwind | Lahore City, Raiwind | Rs 1.25 Cr |
+| LHE-3 Model Town | Model Town | Rs 1.00 Cr |
+
+Carved-out enclaves follow their parent region, so both Lahore hyper markets
+move to LHE-2 with Raiwind, and the territory counts shown are recomputed from
+the effective assignment rather than read from DealerStructure (LHE-1 2,
+LHE-2 4, LHE-3 1). Network total is unchanged at Rs 12.00 Cr.
+
+Both new pairings are contiguous — Cantt and Shalimar share 38 boundary
+vertices, City and Raiwind 7 — so each labels once. The old LHE-1 (Cantt +
+Raiwind) shared none and needed two labels.
+
+The **codes are unchanged**, so anything contractual keyed on LHE-1/2/3 still
+matches; the composition behind them has changed, which is the thing to check
+against the agreement.
 
 **Export:** the panel has a Download CSV button. It exports exactly what is on
 screen — current city, level and year, one row per drawn shape — with every
