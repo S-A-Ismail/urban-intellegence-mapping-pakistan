@@ -155,7 +155,10 @@ button.dl:hover{background:rgba(78,161,255,.13);border-color:rgba(78,161,255,.34
    <div id="g-names" hidden><h2 style="margin-top:11px">Region names</h2>
     <div class="seg" id="c-names"></div>
     <div class="hint" style="margin-top:7px">Every area in each cluster is listed
-    in the panel, so the map shows only the dealership by default.</div></div></div>
+    in the panel, so the map shows only the dealership by default.</div>
+    <h2 style="margin-top:11px">Premium areas</h2>
+    <div class="seg" id="c-merge"></div>
+    <div class="hint" id="mergehint" style="margin-top:7px"></div></div></div>
   <div class="grp"><h2>Year</h2><div class="seg" id="c-year"></div>
    <div class="hint" id="yearhint" style="margin-top:7px"></div></div>
   <div class="grp"><h2>Data layer</h2><div id="c-layer"></div></div>
@@ -313,6 +316,12 @@ const LEVELS={
   {id:"clusters", label:"Dealership clusters", geo:"__clusters__", join:"cluster"}],
 };
 
+/* How a drawn outline can differ from the census unit it carries figures for.
+   Used by the tooltip, the boundary-accuracy card and the CSV. */
+const LVKIND={crosswalk:"crosswalked from an older layer",
+  source:"drawn by a different open source",match:"names and geometry correspond",
+  vintage:"a different administrative vintage"};
+
 /* ================= dealership clusters ==========================
    The commercial grouping, from dealership_clusters.json. An area with no open
    outline is still listed in the panel and simply cannot be drawn. */
@@ -334,6 +343,16 @@ function regionLayerFor(city){
   const l=ls.find(x=>x.join==="region")||ls.find(x=>x.join==="city");
   return l?l.geo:null;
 }
+/* Combining rings into one MultiPolygon is enough — d3.geoPath renders it as a
+   single path, so adjacent outlines share a fill and the seams between them
+   disappear without needing a geometry library. */
+function mergeGeom(fs){
+  const polys=[];
+  fs.forEach(f=>{const g=f.geometry; if(!g) return;
+    if(g.type==="Polygon") polys.push(g.coordinates);
+    else if(g.type==="MultiPolygon") g.coordinates.forEach(c=>polys.push(c));});
+  return {type:"MultiPolygon",coordinates:polys};
+}
 function clusterFeatures(city){
   const out=[];
   // 1. parent territories underneath
@@ -353,17 +372,33 @@ function clusterFeatures(city){
   });
   // 2. premium cluster areas highlighted on top
   const seen={};
-  clustersOf(city).forEach(c=>c.areas.forEach(a=>a.found.forEach(fd=>{
-    const key=fd.layer+"|"+fd.name;
-    if(seen[key]) return; seen[key]=1;
-    const g=GEO[fd.layer]; if(!g) return;
-    const ft=g.features.find(x=>x.properties.name===fd.name &&
-      (!x.properties.city||x.properties.city===city));
-    if(!ft) return;
-    out.push({type:"Feature",geometry:ft.geometry,
-      properties:Object.assign({},ft.properties,
-        {_club:c.code,_clubName:c.name,_area:a.label,_layer:fd.layer,_premium:true})});
-  })));
+  clustersOf(city).forEach(c=>c.areas.forEach(a=>{
+    const parts=[];
+    a.found.forEach(fd=>{
+      const key=fd.layer+"|"+fd.name;
+      if(seen[key]) return; seen[key]=1;
+      const g=GEO[fd.layer]; if(!g) return;
+      const ft=g.features.find(x=>x.properties.name===fd.name &&
+        (!x.properties.city||x.properties.city===city));
+      if(ft) parts.push(ft);
+    });
+    if(!parts.length) return;
+    const base={_club:c.code,_clubName:c.name,_area:a.label,_premium:true};
+    if(S.mergePremium){
+      // One shape per named area. Clifton is nine OSM blocks and
+      // Gulistan-e-Johar fifteen; drawn as a single multi-polygon path they
+      // read as the one place the scheme actually names.
+      out.push({type:"Feature",geometry:mergeGeom(parts),
+        properties:Object.assign({},base,{
+          name:a.label, _merged:parts.length,
+          _layer:parts[0].properties._layer||parts[0].properties.method||null,
+          area_km2:+parts.reduce((t,f)=>t+(f.properties.area_km2||0),0).toFixed(1)})});
+    }else{
+      parts.forEach(ft=>out.push({type:"Feature",geometry:ft.geometry,
+        properties:Object.assign({},ft.properties,base,
+          {_layer:ft.properties._layer||null})}));
+    }
+  }));
   return out;
 }
 
@@ -372,9 +407,11 @@ function clusterFeatures(city){
    dropping to neighbourhoods keeps it as the focus, so the map enlarges that
    district instead of showing all 454 areas at city scale. */
 let S={city:"Pakistan",level:"cities",layer:"population",year:"2026",
-       sel:null,focus:null,regionNames:false};
+       sel:null,focus:null,regionNames:false,mergePremium:false};
 try{const v=localStorage.getItem("pum.regionNames");
-    if(v!=null) S.regionNames=(v==="1");}catch(e){}
+    if(v!=null) S.regionNames=(v==="1");
+    const m=localStorage.getItem("pum.mergePremium");
+    if(m!=null) S.mergePremium=(m==="1");}catch(e){}
 function focusFeature(){
   if(!S.focus) return null;
   for(const l of levels()){
@@ -563,6 +600,10 @@ function draw(recentre){
          +`the enclave's ${km2(m.area)}; the rest has no open boundary.`;
       else if(m&&m._parentArea)
         x=`Parent territory of <b>${m.club} ${m.clubName}</b>.`;
+      else if(m&&m._cluster&&p._merged>1)
+        x=`Premium cluster area <b>${m._area}</b>, inside ${m.club} `
+         +`${m.clubName} — ${p._merged} outlines merged into one shape. The `
+         +`census publishes no statistics at this level.`;
       else if(m&&m._cluster)
         x=`Premium cluster area <b>${m._area}</b>, inside ${m.club} `
          +`${m.clubName}. The census `
@@ -584,6 +625,7 @@ function draw(recentre){
   ln.enter().append("path").merge(ln)
     .attr("d",path).attr("fill","none")
     .attr("stroke",f=>f.properties.name===S.sel?"#ffffff"
+      :f.properties._merged?"none"
       :f.properties._premium?"#f2f6fa"
       :f.properties._parent?"#54687d":"#0b0f14")
     .attr("stroke-width",f=>f.properties.name===S.sel?2
@@ -1049,6 +1091,19 @@ function drawControls(){
        .on("click",()=>{S.regionNames=val;
          try{localStorage.setItem("pum.regionNames",val?"1":"0");}catch(e){}
          draw(false);}));
+    const g=d3.select("#c-merge").html("");
+    [["Outlined",false],["Merged",true]].forEach(([lab,val])=>
+      g.append("button").attr("class",S.mergePremium===val?"on":"").text(lab)
+       .on("click",()=>{S.mergePremium=val;
+         try{localStorage.setItem("pum.mergePremium",val?"1":"0");}catch(e){}
+         draw(false);}));
+    const parts=clustersOf(S.city).reduce((t,c)=>
+      t+c.areas.reduce((u,a)=>u+a.found.length,0),0);
+    const areas=clustersOf(S.city).reduce((t,c)=>
+      t+c.areas.filter(a=>a.found.length).length,0);
+    d3.select("#mergehint").text(S.mergePremium
+      ? "One shape per named area — "+parts+" outlines drawn as "+areas+"."
+      : parts+" separate outlines make up "+areas+" named areas.");
   }
 
   const y=d3.select("#c-year").html("");

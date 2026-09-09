@@ -157,6 +157,11 @@ top at full opacity with a light outline.
 
 Map labels default to the dealership only — the panel already lists every area —
 and a **Region names** toggle (`S.regionNames`, persisted) adds the area labels.
+A **Premium areas** toggle (`S.mergePremium`, persisted) draws one shape per
+named area instead of every constituent outline: Karachi's 90 outlines become 14.
+The merge combines rings into a single MultiPolygon so `d3.geoPath` renders one
+path and the seams disappear — no geometry library needed — and a merged shape
+carries no stroke, since its internal borders are not real edges.
 The dealership label is exempt from collision suppression: at most five per city,
 and a territory going unnamed is worse than a small overlap.
 
