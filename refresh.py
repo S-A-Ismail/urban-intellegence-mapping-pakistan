@@ -301,6 +301,71 @@ for terr, (city, names) in ENCLAVE_GEO.items():
         HYPER[terr]["geo_cover"] = (round(drawn / model_area * 100)
                                     if model_area and drawn else 0)
 
+# ----------------------------------------------- dealership clustering scheme
+# A commercial grouping, not a census unit, so it is hand-edited in
+# dealership_clusters.json rather than read from the workbook. Each named area is
+# resolved to whatever outlines exist for it; an area with none is still listed,
+# labelled as having no outline rather than quietly dropped.
+CLUSTERS = []
+CLUSTER_OF = {}                       # outline "city|layer|name" -> cluster code
+def _norm(s):
+    return re.sub(r"[^a-z0-9]", "", str(s).lower())
+
+if os.path.exists(p("dealership_clusters.json")):
+    scheme = json.load(open(p("dealership_clusters.json"), encoding="utf8"))
+    # Layers a cluster area may be drawn from, best first.
+    #
+    # Tehsil and district layers are deliberately absent. "Lahore Cantt" and
+    # "Model Town" name both a premium neighbourhood and a 100-plus km2
+    # administrative tehsil; matching the tehsil would draw a whole
+    # administrative unit as though it were the cluster area.
+    #
+    # First layer that yields a hit wins, so one place is never drawn twice from
+    # two different layers. Real OSM outlines outrank Lahore's Voronoi locality
+    # cells, which are approximations and are labelled as such in the UI.
+    PRIORITY = ["city_areas", "lahore_localities", "karachi_towns"]
+    POOL = {}
+    for layer in PRIORITY:
+        for ft in GEO.get(layer, {}).get("features", []):
+            q = ft["properties"]
+            nm = q.get("name")
+            if not nm:
+                continue
+            POOL.setdefault((q.get("city") or "", layer), []).append(nm)
+
+    def match(city, prefixes):
+        """Prefix-anchored, so 'E-7' cannot swallow 'Bahria Town Phase 7'."""
+        norms = [_norm(x) for x in prefixes]
+        for layer in PRIORITY:
+            hit = []
+            for nm in POOL.get((city, layer), []):
+                n = _norm(nm)
+                if any(n == q or n.startswith(q) for q in norms):
+                    hit.append({"layer": layer, "name": nm})
+            if hit:
+                return hit
+        return []
+
+    total_areas = total_drawn = 0
+    for c in scheme.get("clusters", []):
+        areas = []
+        for a in c.get("areas", []):
+            found = match(c["city"], a.get("prefixes", []))
+            for f in found:
+                CLUSTER_OF["%s|%s|%s" % (c["city"], f["layer"], f["name"])] = c["code"]
+            areas.append({"label": a["label"], "found": found})
+            total_areas += 1
+            total_drawn += 1 if found else 0
+        CLUSTERS.append(dict(code=c["code"], name=c["name"], city=c["city"],
+                             premium=c.get("premium", True), note=c.get("note"),
+                             areas=areas))
+    print("· clusters: %d dealerships, %d named areas, %d with an outline"
+          % (len(CLUSTERS), total_areas, total_drawn))
+    for c in CLUSTERS:
+        miss = [a["label"] for a in c["areas"] if not a["found"]]
+        if miss:
+            print("    %-6s no outline for: %s" % (c["code"], ", ".join(miss)))
+
 CITY_PT = {"Karachi": [67.01, 24.86], "Lahore": [74.34, 31.55],
            "Islamabad": [73.06, 33.68], "Peshawar": [71.55, 34.01],
            "Multan": [71.48, 30.18]}
@@ -325,7 +390,8 @@ CITY_NOTE = {
 
 DATA = dict(regions=REGIONS, hyper=HYPER, cities=CITIES, dealers=DEALERS,
             meta=META, var=VAR, vkind=VKIND, city_pt=CITY_PT,
-            city_note=CITY_NOTE, enclave=ENCLAVE)
+            city_note=CITY_NOTE, enclave=ENCLAVE,
+            clusters=CLUSTERS, cluster_of=CLUSTER_OF)
 
 # ------------------------------------------------------------- forbidden keys
 # A guard, not a formality. If a future edit reintroduces a commercial field the

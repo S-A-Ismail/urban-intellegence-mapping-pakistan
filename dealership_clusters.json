@@ -1,0 +1,139 @@
+{
+  "_note": [
+    "The dealership clustering scheme. This is a commercial grouping, not a census",
+    "unit, so it lives here rather than in Dealership_Model.xlsx and is edited by",
+    "hand. Deliberately carries no fee: the map is geography and population only.",
+    "",
+    "Each area lists the outline name prefixes that identify it in the geometry.",
+    "Matching is prefix-anchored, not substring, so 'E-7' cannot pick up",
+    "'Bahria Town Phase 7'. An area with no match is still listed in the panel;",
+    "it simply has no open outline to draw, and is labelled as such.",
+    "",
+    "refresh.py reports coverage on every run. Add a prefix here to link an area",
+    "once an outline for it exists."
+  ],
+  "clusters": [
+    {
+      "code": "KHI-1", "name": "South & Coastal", "city": "Karachi",
+      "premium": true,
+      "areas": [
+        {"label": "Clifton", "prefixes": ["Clifton", "Old Clifton"]},
+        {"label": "DHA Phases I-VIII", "prefixes": ["DHA Phase"]},
+        {"label": "Karachi Cantt", "prefixes": ["Karachi Cantonment"]},
+        {"label": "Saddar", "prefixes": ["Saddar"]}
+      ]
+    },
+    {
+      "code": "KHI-2", "name": "East & Korangi", "city": "Karachi",
+      "premium": true,
+      "areas": [
+        {"label": "KDA Scheme 1", "prefixes": ["KDA Scheme 1"]},
+        {"label": "Karsaz", "prefixes": ["Karsaz"]},
+        {"label": "PECHS", "prefixes": ["PECHS"]},
+        {"label": "Bahadurabad", "prefixes": ["Bahadurabad"]},
+        {"label": "Gulshan-e-Iqbal", "prefixes": ["Gulshan e Iqbal", "Gulshan-e-Iqbal"]},
+        {"label": "Gulistan-e-Johar", "prefixes": ["Gulistan e Johar", "Gulistan-e-Johar"]}
+      ]
+    },
+    {
+      "code": "KHI-3", "name": "Central, West & Keamari", "city": "Karachi",
+      "premium": true,
+      "areas": [
+        {"label": "North Nazimabad", "prefixes": ["North Nazimabad"]},
+        {"label": "F.B. Area", "prefixes": ["FB Area", "F.B. Area"]},
+        {"label": "Nazimabad", "prefixes": ["Nazimabad"]},
+        {"label": "Naya Nazimabad", "prefixes": ["Naya Nazimabad"]},
+        {"label": "SITE", "prefixes": ["Site Town", "SITE"]}
+      ]
+    },
+    {
+      "code": "KHI-4", "name": "Malir & Outer", "city": "Karachi",
+      "premium": true,
+      "areas": [
+        {"label": "Malir Cantt", "prefixes": ["Malir Cantonment", "Malir Cantt"]},
+        {"label": "Bahria Town Karachi", "prefixes": ["Bahria Town Karachi", "Bahria Town Sports City"]},
+        {"label": "DHA City", "prefixes": ["DHA City"]},
+        {"label": "Korangi Creek Cantt", "prefixes": ["Korangi Creek"]}
+      ]
+    },
+    {
+      "code": "LHE-1", "name": "South Lahore", "city": "Lahore",
+      "premium": true,
+      "areas": [
+        {"label": "DHA Lahore I-VI", "prefixes": ["DHA Phase 1", "DHA Phase 2", "DHA Phase 3", "DHA Phase 4", "DHA Phase 5", "DHA Phase 6"]},
+        {"label": "DHA Lahore VII-IX", "prefixes": ["DHA Phase 7", "DHA Phase 8", "DHA Phase 9"]},
+        {"label": "Cavalry Ground", "prefixes": ["Cavalry Ground"]},
+        {"label": "Lahore Cantt", "prefixes": ["Lahore Cantonment", "Lahore Cantt"]},
+        {"label": "Walton Cantt", "prefixes": ["Walton"]},
+        {"label": "EME Society", "prefixes": ["EME Society", "EME"]},
+        {"label": "Bahria Town Lahore", "prefixes": ["Bahria Town"]},
+        {"label": "Lake City", "prefixes": ["Lake City"]}
+      ]
+    },
+    {
+      "code": "LHE-2", "name": "Central Lahore", "city": "Lahore",
+      "premium": false,
+      "note": "No designated premium cluster. The areas below are representative localities in the central tehsils, taken from the Lahore locality layer — not a premium grouping.",
+      "areas": [
+        {"label": "Samanabad", "prefixes": ["Samanabad"]},
+        {"label": "Shadman", "prefixes": ["Shadman"]},
+        {"label": "Mozang", "prefixes": ["Mozang"]},
+        {"label": "Krishan Nagar", "prefixes": ["Krishan Nagar"]},
+        {"label": "Islampura", "prefixes": ["Islampura"]},
+        {"label": "Sanda", "prefixes": ["Sanda"]},
+        {"label": "Gulshan-e-Ravi", "prefixes": ["Gulshan-e-Ravi", "Gulshan e Ravi"]},
+        {"label": "Garhi Shahu", "prefixes": ["Garhi Shahu"]},
+        {"label": "Misri Shah", "prefixes": ["Misri Shah"]},
+        {"label": "Baghbanpura", "prefixes": ["Baghbanpura"]},
+        {"label": "Mughalpura", "prefixes": ["Mughalpura"]},
+        {"label": "Harbanspura", "prefixes": ["Harbanspura"]}
+      ]
+    },
+    {
+      "code": "LHE-3", "name": "West Lahore", "city": "Lahore",
+      "premium": true,
+      "areas": [
+        {"label": "Gulberg I-V", "prefixes": ["Gulberg"]},
+        {"label": "Garden Town", "prefixes": ["Garden Town"]},
+        {"label": "Model Town", "prefixes": ["Model Town"]},
+        {"label": "Faisal Town", "prefixes": ["Faisal Town"]},
+        {"label": "Johar Town", "prefixes": ["Johar Town"]}
+      ]
+    },
+    {
+      "code": "MUX-1", "name": "Multan", "city": "Multan",
+      "premium": true,
+      "areas": [
+        {"label": "Multan Cantt", "prefixes": ["Multan Cantonment", "Multan Cantt"]},
+        {"label": "MDA scheme area", "prefixes": ["MDA"]}
+      ]
+    },
+    {
+      "code": "PEW-1", "name": "Peshawar", "city": "Peshawar",
+      "premium": true,
+      "areas": [
+        {"label": "Hayatabad Phases 1-7", "prefixes": ["Hayatabad"]},
+        {"label": "University Town", "prefixes": ["University Town"]},
+        {"label": "Peshawar Cantt", "prefixes": ["Peshawar Cantonment", "Peshawar Cantt"]}
+      ]
+    },
+    {
+      "code": "ISB-1", "name": "Islamabad", "city": "Islamabad",
+      "premium": true,
+      "areas": [
+        {"label": "DHA Islamabad I-V", "prefixes": ["DHA Phase", "DHA Islamabad"]},
+        {"label": "Bahria Enclave", "prefixes": ["Bahria Enclave"]},
+        {"label": "Gulberg Greens & Residencia", "prefixes": ["Gulberg Greens", "Gulberg Residencia"]},
+        {"label": "Park View City", "prefixes": ["Park View"]},
+        {"label": "E-7", "prefixes": ["E-7"]},
+        {"label": "E-11", "prefixes": ["E-11"]},
+        {"label": "F-6", "prefixes": ["F-6"]},
+        {"label": "F-7", "prefixes": ["F-7"]},
+        {"label": "F-8", "prefixes": ["F-8"]},
+        {"label": "F-10", "prefixes": ["F-10"]},
+        {"label": "F-11", "prefixes": ["F-11"]},
+        {"label": "G-series sectors", "prefixes": ["G-6", "G-7", "G-8", "G-9", "G-10", "G-11", "G-13", "G-14", "G-15", "G-16"]}
+      ]
+    }
+  ]
+}

@@ -140,7 +140,19 @@ because there is nothing to format with one. If a future change reintroduces
 money, it belongs in a separate internal build, not this one.
 
 **Layers:** population, density, growth, households, new households, new-housing
-intensity, population added, household size, area. Nine, all census-derived.
+intensity, population added, household size, area — nine census-derived — plus
+**Dealership**, a categorical layer colouring regions by the club covering them.
+
+**Dealership clusters** are a geographic level in every city, defined in
+`dealership_clusters.json` (hand-edited; a commercial grouping, not a census
+unit, and carrying no fee). Area names resolve to outlines by **prefix-anchored**
+match — `E-7` must not swallow "Bahria Town Phase 7" — searching `city_areas`,
+then `lahore_localities`, then `karachi_towns`, first hit wins so nothing is
+drawn twice. **Tehsil layers are excluded deliberately:** "Lahore Cantt" and
+"Model Town" name both a premium neighbourhood and a 100-plus km² tehsil, and
+matching the tehsil would draw an administrative unit as the cluster area.
+43 of 61 named areas have an outline; the other 18 are listed greyed and never
+approximated.
 
 **Export:** the panel has a Download CSV button. It exports exactly what is on
 screen — current city, level and year, one row per drawn shape — with every

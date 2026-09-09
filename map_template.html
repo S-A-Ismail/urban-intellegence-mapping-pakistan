@@ -128,6 +128,16 @@ tr.on td{background:rgba(78,161,255,.1)}
 .infobox{background:rgba(78,161,255,.07);border:1px solid rgba(78,161,255,.22);
  border-radius:6px;padding:9px 10px;font-size:10px;line-height:1.5;color:#a8c8ea}
 .hint{font-size:10px;color:var(--faint);line-height:1.5}
+.clus{padding:7px 0;border-bottom:1px solid rgba(30,43,56,.5)}
+.clus:last-of-type{border-bottom:none}
+.ch{font-size:11px;display:flex;align-items:center;gap:6px;margin-bottom:5px}
+.ch i{width:9px;height:9px;border-radius:2px;flex:0 0 auto}
+.ch b{color:var(--ink);font-family:var(--mono);font-size:10.5px}
+.ch .cn{margin-left:auto;font-size:9px;color:var(--faint);white-space:nowrap}
+.chips{display:flex;flex-wrap:wrap;gap:3px}
+.chip{font-size:9.5px;background:var(--panel2);border:1px solid var(--line);
+ color:var(--dim);padding:2px 6px;border-radius:3px;white-space:nowrap}
+.chip.off{opacity:.42;border-style:dashed}
 button.dl{width:100%;background:var(--panel2);border:1px solid var(--line);
  color:var(--acc);font:inherit;font-size:11.5px;font-weight:550;padding:8px;
  border-radius:5px;cursor:pointer;transition:.13s}
@@ -247,6 +257,10 @@ const LAYERS={
  hhsize:{label:"Household size",acc:m=>m&&m.hh_size,fmt:v=>dec(v,2)+" people",
    note:()=>"Average people per household, 2023 census. A census input, so the "
             +"year toggle does not change it.",prov:()=>"official"},
+ club:{label:"Dealership",acc:m=>m&&m.club,fmt:v=>v||"—",cat:true,
+   note:()=>"Which of the ten dealerships covers each region. A grouping, not a "
+            +"census unit — from dealership_clusters.json and the "
+            +"DealerStructure sheet.",prov:()=>"derived"},
  area:{label:"Area",acc:m=>m&&m.area,fmt:km2,
    note:()=>"Census area. Where a drawn outline differs from it, the gap is "
             +"stated on the shape rather than smoothed over.",prov:()=>"official"},
@@ -263,21 +277,50 @@ const LEVELS={
  Karachi:[
   {id:"district", label:"Districts (7)",    geo:"karachi_districts",  join:"region"},
   {id:"town",     label:"Towns (18)",       geo:"karachi_towns",      join:null},
-  {id:"area",     label:"Neighbourhoods",   geo:"city_areas",         join:"enclave"}],
+  {id:"area",     label:"Neighbourhoods",   geo:"city_areas",         join:"enclave"},
+  {id:"clusters", label:"Dealership clusters", geo:"__clusters__", join:"cluster"}],
  Lahore:[
   {id:"tehsil",   label:"Tehsils (10)",     geo:"lahore_tehsils",     join:"region"},
   {id:"locality", label:"Localities (801)", geo:"lahore_localities",  join:null},
-  {id:"area",     label:"Neighbourhoods",   geo:"city_areas",         join:"enclave"}],
+  {id:"area",     label:"Neighbourhoods",   geo:"city_areas",         join:"enclave"},
+  {id:"clusters", label:"Dealership clusters", geo:"__clusters__", join:"cluster"}],
  Islamabad:[
   {id:"district", label:"ICT (whole)",      geo:"islamabad_district", join:"city"},
-  {id:"area",     label:"Neighbourhoods",   geo:"city_areas",         join:"enclave"}],
+  {id:"area",     label:"Neighbourhoods",   geo:"city_areas",         join:"enclave"},
+  {id:"clusters", label:"Dealership clusters", geo:"__clusters__", join:"cluster"}],
  Peshawar:[
   {id:"territory",label:"Territories (4)",  geo:"peshawar_groups",    join:"region"},
   {id:"tehsil",   label:"Tehsils (7)",      geo:"peshawar_tehsils",   join:null},
-  {id:"area",     label:"Neighbourhoods",   geo:"city_areas",         join:"enclave"}],
+  {id:"area",     label:"Neighbourhoods",   geo:"city_areas",         join:"enclave"},
+  {id:"clusters", label:"Dealership clusters", geo:"__clusters__", join:"cluster"}],
  Multan:[
-  {id:"tehsil",   label:"Tehsils (4)",      geo:"multan_tehsils",     join:"region"}],
+  {id:"tehsil",   label:"Tehsils (4)",      geo:"multan_tehsils",     join:"region"},
+  {id:"clusters", label:"Dealership clusters", geo:"__clusters__", join:"cluster"}],
 };
+
+/* ================= dealership clusters ==========================
+   The commercial grouping, from dealership_clusters.json. An area with no open
+   outline is still listed in the panel and simply cannot be drawn. */
+const CLUSTERS=D.clusters||[];
+const CLUB_COLOR={"KHI-1":"#e2683c","KHI-2":"#f0a94e","KHI-3":"#dfd97a",
+ "KHI-4":"#9fc78e","LHE-1":"#5aa8a0","LHE-2":"#2a8296","LHE-3":"#1c5c78",
+ "MUX-1":"#a98fd8","PEW-1":"#d47fb0","ISB-1":"#6f9fd8"};
+function clustersOf(city){return CLUSTERS.filter(c=>c.city===city);}
+function clusterFeatures(city){
+  const out=[],seen={};
+  clustersOf(city).forEach(c=>c.areas.forEach(a=>a.found.forEach(fd=>{
+    const key=fd.layer+"|"+fd.name;
+    if(seen[key]) return; seen[key]=1;
+    const fc=GEO[fd.layer]; if(!fc) return;
+    const ft=fc.features.find(x=>x.properties.name===fd.name &&
+      (!x.properties.city||x.properties.city===city));
+    if(!ft) return;
+    out.push({type:"Feature",geometry:ft.geometry,
+      properties:Object.assign({},ft.properties,
+        {_club:c.code,_clubName:c.name,_area:a.label,_layer:fd.layer})});
+  })));
+  return out;
+}
 const LVKIND={crosswalk:"crosswalked from an older layer",
   source:"drawn by a different open source",match:"names and geometry correspond",
   vintage:"a different administrative vintage"};
@@ -291,7 +334,7 @@ let S={city:"Pakistan",level:"cities",layer:"population",year:"2026",
 function focusFeature(){
   if(!S.focus) return null;
   for(const l of levels()){
-    const fc=GEO[l.geo]; if(!fc) continue;
+    const fc=GEO[l.geo]; if(!fc) continue;   // __clusters__ has no GEO entry
     const f=fc.features.find(x=>x.properties.name===S.focus);
     if(f) return f;
   }
@@ -302,7 +345,9 @@ function levels(){return LEVELS[S.city]||LEVELS.Pakistan}
 function lvl(){return levels().find(l=>l.id===S.level)||levels()[0]}
 
 function features(){
-  const L=lvl(), fc=GEO[L.geo];
+  const L=lvl();
+  if(L.geo==="__clusters__") return clusterFeatures(S.city);
+  const fc=GEO[L.geo];
   if(!fc) return [];
   let fs=fc.features;
   if(L.geo==="city_areas") fs=fs.filter(f=>f.properties.city===S.city);
@@ -319,6 +364,8 @@ function datum(f){
     const key=p.city+"|"+n, t=(D.enclave||{})[key];
     return t&&HYP[t]?Object.assign({},HYP[t],{_terr:t,_enclave:true}):null;
   }
+  if(L.join==="cluster") return {club:p._club,clubName:p._clubName,
+    area:p.area_km2,_area:p._area,_cluster:true};
   return null;
 }
 
@@ -375,7 +422,8 @@ function showTip(ev,name,sub,m,extra){
     put("Households", m.hh!=null?cnt(m.hh):null);
     put("Area",       m.area?km2(m.area):null);
     put("Density",    m.density!=null?dens(m.density):null);
-    put("Dealership", m.club||null);
+    put("Dealership", m.club?(m.club+(m.clubName?" · "+m.clubName:"")):null);
+    put("Cluster area", m._area||null);
   }else{
     h+=`<div class="r"><span>No statistics at this level</span></div>`;
   }
@@ -417,7 +465,8 @@ function draw(recentre){
   // A choropleth is only meaningful when most shapes carry a value. Below that
   // the level is drawn as boundaries, with the priced enclaves picked out, and
   // the legend says so rather than showing an invented 0-to-1 scale.
-  shapesOnly = vals.length < Math.max(2, fs.length*0.25);
+  shapesOnly = !L.cat && lvl().join!=="cluster"
+               && vals.length < Math.max(2, fs.length*0.25);
   const ext=vals.length?d3.extent(vals):[0,1];
   if(ext[0]===ext[1]) ext[1]=ext[0]+1;
   scale.domain(ext);
@@ -427,6 +476,8 @@ function draw(recentre){
   sel.enter().append("path").merge(sel)
     .attr("d",path)
     .attr("fill",f=>{const m=datum(f);const v=m?L.acc(m):null;
+      if(f.properties._club) return CLUB_COLOR[f.properties._club]||"#1b2837";
+      if(L.cat) return v==null?"#16202c":(CLUB_COLOR[v]||"#3a4a5c");
       if(shapesOnly) return (m&&m._enclave)?"#8a6a24":"#1b2837";
       return (v==null||isNaN(v))?"#16202c":scale(v);})
     .attr("stroke","none")
@@ -440,6 +491,14 @@ function draw(recentre){
       else if(m&&m._enclave)
         x=`Part of <b>${m._terr}</b>. This outline covers ${m.geo_cover||0}% of `
          +`the enclave's ${km2(m.area)}; the rest has no open boundary.`;
+      else if(m&&m._cluster)
+        x=`In the <b>${m._area}</b> cluster area of ${m.club}. The census `
+         +`publishes no statistics at this level.`
+         +(p._layer==="lahore_localities"
+           ? ` This outline is a Voronoi cell around a locality point, not a`
+             +` surveyed boundary.`
+           : p._layer==="karachi_towns"
+           ? ` Drawn at town level — the only outline available for it.` : "");
       else if(lv.join===null)
         x="Boundary only — the census publishes no statistics at this level.";
       showTip(ev,p.name||"—",sublabel(f),m,x);})
@@ -510,6 +569,29 @@ function sublabel(f){
 /* ================= legend ======================================= */
 function drawLegend(){
   const L=LAYERS[S.layer];
+  const clusterView = lvl().join==="cluster";
+  if(clusterView||L.cat){
+    const codes=clusterView?[...new Set(features().map(f=>f.properties._club))]
+      :[...new Set(features().map(f=>{const m=datum(f);return m&&m.club;}))]
+        .filter(Boolean);
+    codes.sort();
+    d3.select("#ltitle").text(clusterView?"Dealership clusters":"Dealership");
+    d3.select("#ramp").style("background",codes.length
+      ? "linear-gradient(90deg,"+codes.map((c,i)=>
+          `${CLUB_COLOR[c]||"#3a4a5c"} ${i/codes.length*100}%,`+
+          `${CLUB_COLOR[c]||"#3a4a5c"} ${(i+1)/codes.length*100}%`).join(",")+")"
+      : "#1b2634");
+    d3.select("#lscale").selectAll("span").data([codes[0]||"",codes[codes.length-1]||""])
+      .text(x=>x);
+    d3.select("#lnote").html(`<span class="pill p-der">Derived</span> `
+      +(clusterView
+        ? `The named areas in each dealership's cluster, coloured by dealership. `
+          +`Areas with no open outline are listed in the panel but cannot be drawn.`
+        : `Each region coloured by the dealership covering it.`));
+    d3.select("#yearflag").html(S.year==="2023"
+      ? `<b>2023</b> census — official` : `<b>2026</b> projected — derived`);
+    return;
+  }
   if(shapesOnly&&!L.disabled){
     d3.select("#ltitle").text(lvl().label+" — boundaries only");
     d3.select("#ramp").style("background",
@@ -564,6 +646,17 @@ function drawPanel(){
     R.selectAll("tr.pick").on("click",function(){
       S.city=this.dataset.city; S.level=LEVELS[S.city][0].id;
       S.sel=null; S.focus=null; draw(true);});
+    const allc=R.append("div").attr("class","card");
+    allc.html(`<h3>Dealership clusters · all cities</h3>`);
+    CLUSTERS.forEach(c=>{
+      const drawn=c.areas.filter(a=>a.found.length).length;
+      allc.append("div").attr("class","clus").html(
+        `<div class="ch"><i style="background:${CLUB_COLOR[c.code]||"#3a4a5c"}"></i>
+           <b>${c.code}</b> ${c.name}
+           <span class="cn">${c.city} · ${drawn}/${c.areas.length} drawn</span></div>
+         <div class="chips">${c.areas.map(a=>
+           `<span class="chip${a.found.length?"":" off"}">${a.label}</span>`).join("")}</div>`);
+    });
     addExport(R);
     return;
   }
@@ -641,6 +734,34 @@ function drawPanel(){
      census figures. "Drawn" is how much of the enclave has an open outline —
      the rest has none, so it is not drawn rather than estimated.</div>`);
 
+  // the clustering scheme: cluster name, then every area name in it
+  const cls=clustersOf(S.city);
+  if(cls.length){
+    const card=R.append("div").attr("class","card");
+    card.html(`<h3>Dealership clusters</h3>`);
+    cls.forEach(c=>{
+      const drawn=c.areas.filter(a=>a.found.length).length;
+      const chips=c.areas.map(a=>`<span class="chip${a.found.length?"":" off"}"
+        title="${a.found.length?a.found.length+" outline(s)":"no open outline"}"
+        >${a.label}</span>`).join("");
+      card.append("div").attr("class","clus").html(
+        `<div class="ch"><i style="background:${CLUB_COLOR[c.code]||"#3a4a5c"}"></i>
+           <b>${c.code}</b> ${c.name}
+           <span class="cn">${drawn}/${c.areas.length} drawn</span></div>
+         ${c.premium?"":`<div class="hint" style="margin:3px 0 5px">${c.note||""}</div>`}
+         <div class="chips">${chips}</div>`);
+    });
+    const vor=cls.some(c=>c.areas.some(a=>a.found.some(fd=>fd.layer==="lahore_localities")));
+    const twn=cls.some(c=>c.areas.some(a=>a.found.some(fd=>fd.layer==="karachi_towns")));
+    card.append("div").attr("class","hint").style("margin-top","9px")
+      .html(`Faded names have no open outline, so they are listed but not drawn —
+             never invented. Switch the level to <b>Dealership clusters</b> to see
+             the drawn ones on the map.`
+        +(vor?` Some are drawn from Lahore's Voronoi locality cells, which are
+             approximations around a point rather than surveyed boundaries.`:"")
+        +(twn?` SITE is drawn at town level, the only outline available for it.`:""));
+  }
+
   // dealership structure — the grouping only, no commercial figures
   const clubs=Object.entries(D.dealers||{}).filter(([,v])=>v.city===S.city);
   if(clubs.length) R.append("div").attr("class","card").html(
@@ -674,7 +795,10 @@ const CSV_COLS=[
  ["Growth_pct_yr",(n,p,m)=>m&&m.cagr!=null?(m.cagr*100).toFixed(3):""],
  ["Population_added",(n,p,m)=>m&&m.newpop!=null?Math.round(m.newpop):""],
  ["New_households",(n,p,m)=>m&&m.newhh!=null?Math.round(m.newhh):""],
- ["Dealership",  (n,p,m)=>(m&&m.club)||""],
+ ["Dealership",  (n,p,m)=>(m&&m.club)||p._club||""],
+ ["Dealership_name",(n,p,m)=>{const c=(D.dealers||{})[(m&&m.club)||p._club];
+    return c?c.name:(p._clubName||"");}],
+ ["Premium_area",(n,p)=>p._area||""],
  ["Shape_vs_census_pct",n=>(D.var&&D.var[n]!=null)?D.var[n]:""],
  ["Shape_note",  n=>(D.vkind&&D.vkind[n])?LVKIND[D.vkind[n]]:""],
  ["Geometry_source",(n,p)=>p.source||p.method||(lvl().geo==="city_areas"?"osm":"admin")],

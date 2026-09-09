@@ -36,6 +36,10 @@ often serve the cached copy.
   column plus the boundary-accuracy gap and its reason.
 - **Collapsible panels** — drawer handles at the map edges, or `[` and `]`, or
   `f` to hide both for presenting. The map re-fits into the space.
+- **Dealership clusters** — a geographic level in every city, drawing the named
+  areas in each dealership's cluster, coloured by dealership. There is also a
+  **Dealership** data layer that colours whole census regions by the dealership
+  covering them.
 
 Select a territory and drop a level and the map **enlarges that territory** —
 this is how you get from Karachi South down to Clifton and Defence. The
@@ -74,6 +78,7 @@ You should see:
 | `Dealership_Model.xlsx` | no | census, projections, and the dealership grouping — nothing commercial |
 | `scenario_a.json` | no | fallback if the workbook is absent |
 | `census.json` | no | overrides for any census figure |
+| `dealership_clusters.json` | no | the clustering scheme — cluster and area names |
 
 Nothing is hardcoded in `refresh.py`. Every census figure and projection comes
 from the workbook, so changing an assumption there is the only thing you need to
@@ -82,6 +87,43 @@ do.
 `refresh.py` ends with a `FORBIDDEN` key check. If an edit ever reintroduces a
 fee, quota or revenue field, the build fails with a message naming it rather
 than quietly publishing the fee schedule inside the page.
+
+---
+
+## Changing the dealership clustering
+
+The scheme lives in `dealership_clusters.json` — a commercial grouping, not a
+census unit, so it is hand-edited rather than read from the workbook. It carries
+no fee, in keeping with the scope above.
+
+```json
+{ "code": "KHI-1", "name": "South & Coastal", "city": "Karachi",
+  "premium": true,
+  "areas": [ { "label": "Clifton", "prefixes": ["Clifton", "Old Clifton"] } ] }
+```
+
+`prefixes` are the outline names that identify the area in the geometry. Matching
+is **prefix-anchored, not substring**, so `E-7` cannot pick up "Bahria Town
+Phase 7". Outlines are searched in priority order — `city_areas`, then
+`lahore_localities`, then `karachi_towns` — and the first layer with a hit wins,
+so one place is never drawn twice.
+
+Tehsil and district layers are excluded on purpose. "Lahore Cantt" and "Model
+Town" name both a premium neighbourhood and a 100-plus km² administrative
+tehsil; matching the tehsil would draw a whole administrative unit as if it were
+the cluster area.
+
+An area with no outline anywhere is still listed in the panel, greyed, and
+labelled as having none. It is never approximated. `refresh.py` prints the
+coverage on every run:
+
+```
+· clusters: 10 dealerships, 61 named areas, 43 with an outline
+    KHI-1  no outline for: Karachi Cantt
+```
+
+Set `"premium": false` and add a `note` for a dealership with no designated
+premium cluster — LHE-2 Central Lahore lists representative localities instead.
 
 ---
 
