@@ -343,6 +343,32 @@ function regionLayerFor(city){
   const l=ls.find(x=>x.join==="region")||ls.find(x=>x.join==="city");
   return l?l.geo:null;
 }
+/* Which of a dealership's territories actually touch.
+   South Lahore is Lahore Cantt in the east and Raiwind in the south-west and
+   they share no boundary, so the name belongs on both. Multan's four tehsils do
+   touch, so the name belongs on the blob once. Centroid distance cannot tell
+   these apart — Multan's tehsils are large enough that their centres are far
+   apart — but a shared boundary vertex can: every adjacent pair here shares
+   between 2 and 89, every separated pair shares none. */
+function vertexKeys(f){
+  const g=f.geometry, out=new Set();
+  const add=poly=>poly.forEach(r=>r.forEach(p=>out.add(p[0].toFixed(3)+","+p[1].toFixed(3))));
+  if(g.type==="Polygon") add(g.coordinates);
+  else if(g.type==="MultiPolygon") g.coordinates.forEach(add);
+  return out;
+}
+function components(fs){
+  const sets=fs.map(vertexKeys), up=fs.map((_,i)=>i);
+  const find=i=>up[i]===i?i:(up[i]=find(up[i]));
+  for(let i=0;i<fs.length;i++) for(let j=i+1;j<fs.length;j++){
+    if(fs[i].properties._club!==fs[j].properties._club) continue;
+    let touch=false;
+    for(const v of sets[i]) if(sets[j].has(v)){touch=true;break;}
+    if(touch) up[find(i)]=find(j);
+  }
+  return fs.map((_,i)=>find(i));
+}
+
 /* Combining rings into one MultiPolygon is enough — d3.geoPath renders it as a
    single path, so adjacent outlines share a fill and the seams between them
    disappear without needing a geometry library. */
@@ -662,11 +688,16 @@ function draw(recentre){
   let labels;
   if(lv.join==="cluster"){
     const grp={};
+    const pars=vis.filter(f=>f.properties._parent);
+    const comp=components(pars);
+    const compOf=new Map(); pars.forEach((f,i)=>compOf.set(f,comp[i]));
     vis.forEach(f=>{const p=f.properties;
-      // The dealership always gets a label. The areas inside it are optional —
-      // the panel lists every one, so the map need not repeat them.
+      // The dealership always gets a label, once per touching group of its
+      // territories. The areas inside it are optional — the panel lists every
+      // one, so the map need not repeat them.
       if(!p._parent && !S.regionNames) return;
-      const k=p._parent ? "P|"+p._club : "A|"+p._club+"|"+p._area;
+      const k=p._parent ? "P|"+p._club+"|"+compOf.get(f)
+                        : "A|"+p._club+"|"+p._area;
       (grp[k]=grp[k]||[]).push(f);});
     labels=Object.entries(grp).map(([gkey,g])=>{
       // anchor on the member nearest the group's mean centre, so the label sits
@@ -707,7 +738,8 @@ function draw(recentre){
   const tr = recentre ? d3.zoomIdentity : d3.zoomTransform(svg.node());
   const sc = Math.pow(tr.k, 0.28);
   const gArea=d=>d.geo.properties.area_km2||0;
-  const placed=[];
+  const placed=[], placedP=[];
+  const hits=(b,list)=>list.some(q=>b[0]<q[2]&&b[2]>q[0]&&b[1]<q[3]&&b[3]>q[1]);
   labels=labels.sort((a,b)=>(b.parent?1:0)-(a.parent?1:0)||gArea(b)-gArea(a))
     .filter(d=>{
     const c0=fpath.centroid(d.geo);
@@ -717,11 +749,10 @@ function draw(recentre){
     const w=(Math.max(d.text.length*5.9,(d.sub||"").length*4.9)+8)*sc,
           h=(d.sub?24:14)*sc;
     const b=[x-w/2,y-h/2,x+w/2,y+h/2];
-    // A dealership label is the primary thing on this view and there are at most
-    // five per city, so it is never suppressed — a small overlap beats a
-    // territory going unnamed.
-    if(d.parent){placed.push(b); return true;}
-    if(placed.some(q=>b[0]<q[2]&&b[2]>q[0]&&b[1]<q[3]&&b[3]>q[1])) return false;
+    // One label per touching group of territories, so the count is already
+    // small and every one of them is worth keeping.
+    if(d.parent){placedP.push(b); placed.push(b); return true;}
+    if(hits(b,placed)) return false;
     placed.push(b); return true;
   });
 

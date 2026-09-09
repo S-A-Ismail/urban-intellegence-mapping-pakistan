@@ -157,6 +157,14 @@ top at full opacity with a light outline.
 
 Map labels default to the dealership only — the panel already lists every area —
 and a **Region names** toggle (`S.regionNames`, persisted) adds the area labels.
+A dealership is labelled **once per touching group of its territories**, not once
+overall. South Lahore is Lahore Cantt in the east and Raiwind in the south-west
+with no shared boundary, so the name belongs on both; Multan's four tehsils do
+touch, so it appears once. Centroid distance cannot tell those apart — Multan's
+tehsils are large enough that their centres are far apart — so the grouping is a
+union-find over **shared boundary vertices**: every adjacent pair in this data
+shares 2 to 89, every separated pair shares none.
+
 A **Premium areas** toggle (`S.mergePremium`, persisted) switches between
 *Highlighted* and *Merged*. Merged means **same colour**: the premium area takes
 the dealership's own shade so the territory reads as one block.

@@ -59,6 +59,10 @@ often serve the cached copy.
   price appears on the map — the proposed fee is in the panel and the CSV. There is also a **Dealership** data layer colouring
   whole regions by club.
 
+A dealership that holds separated territories is named on each of them — South
+Lahore appears twice, on Lahore Cantt and on Raiwind — while territories that
+touch are named once between them.
+
 Select a territory and drop a level and the map **enlarges that territory** —
 this is how you get from Karachi South down to Clifton and Defence. The
 breadcrumb shows what you are zoomed into and lets you clear it.
