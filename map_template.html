@@ -294,7 +294,8 @@ const LEVELS={
   {id:"area",     label:"Neighbourhoods",   geo:"city_areas",         join:"enclave"},
   {id:"clusters", label:"Dealership clusters", geo:"__clusters__", join:"cluster"}],
  Lahore:[
-  {id:"tehsil",   label:"Tehsils (10)",     geo:"lahore_tehsils",     join:"region"},
+  {id:"tehsil",   label:"Tehsils (5, census)", geo:"lahore_census_tehsils", join:"region"},
+  {id:"tehsil24", label:"Tehsils (10, 2024)",  geo:"lahore_tehsils",     join:null},
   {id:"locality", label:"Localities (801)", geo:"lahore_localities",  join:null},
   {id:"area",     label:"Neighbourhoods",   geo:"city_areas",         join:"enclave"},
   {id:"clusters", label:"Dealership clusters", geo:"__clusters__", join:"cluster"}],
@@ -316,8 +317,12 @@ const LEVELS={
    The commercial grouping, from dealership_clusters.json. An area with no open
    outline is still listed in the panel and simply cannot be drawn. */
 const CLUSTERS=D.clusters||[];
+/* Karachi's four are left as they are. Lahore's three were three adjacent
+   stops off the sequential ramp — #5aa8a0, #2a8296, #1c5c78 — near-identical
+   teals, and the darkest all but vanished once a parent territory was shaded
+   back to 26%. They are now separated across the hue wheel. */
 const CLUB_COLOR={"KHI-1":"#e2683c","KHI-2":"#f0a94e","KHI-3":"#dfd97a",
- "KHI-4":"#9fc78e","LHE-1":"#5aa8a0","LHE-2":"#2a8296","LHE-3":"#1c5c78",
+ "KHI-4":"#9fc78e","LHE-1":"#2fb8f0","LHE-2":"#8b5cf6","LHE-3":"#34d399",
  "MUX-1":"#a98fd8","PEW-1":"#d47fb0","ISB-1":"#6f9fd8"};
 function clustersOf(city){return CLUSTERS.filter(c=>c.city===city);}
 
@@ -421,7 +426,8 @@ function datum(f){
 const svg=d3.select("#map"), gRoot=svg.append("g");
 const gCtx=gRoot.append("g"), gFill=gRoot.append("g"), gLine=gRoot.append("g"),
       gPt=gRoot.append("g"), gLab=gRoot.append("g");
-let W=0,H=0,proj,path,labelsAlways=false,shapesOnly=false,relabel=null;
+let W=0,H=0,proj,path,labelsAlways=false,shapesOnly=false,relabel=null,
+    flatMode=false,flatSpread=0;
 const RAMP=["#12202e","#173c55","#1c5c78","#2a8296","#5aa8a0","#9fc78e","#dfd97a","#f0a94e","#e2683c"];
 const scale=d3.scaleSequential(t=>d3.interpolateRgbBasis(RAMP)(t));
 function size(){const r=document.getElementById("stage").getBoundingClientRect();
@@ -521,6 +527,14 @@ function draw(recentre){
   shapesOnly = !L.cat && lvl().join!=="cluster"
                && vals.length < Math.max(2, fs.length*0.25);
   const ext=vals.length?d3.extent(vals):[0,1];
+  // Near-uniform data: a linear ramp stretches whatever spread exists across the
+  // whole palette, so a rounding difference reads as dark-to-bright. Lahore's
+  // household sizes run 6.3 to 6.5 — a 3% spread that should not look dramatic.
+  // Anything with a real spread (Karachi's tightest layer is 17%) is untouched.
+  const med=vals.length?d3.median(vals):0;
+  flatSpread = (vals.length>1 && Math.abs(med)>1e-9)
+    ? (ext[1]-ext[0])/Math.abs(med) : 1;
+  flatMode = vals.length>1 && flatSpread<0.05;
   if(ext[0]===ext[1]) ext[1]=ext[0]+1;
   scale.domain(ext);
 
@@ -533,7 +547,8 @@ function draw(recentre){
       // (opacity below separates parent territory from premium cluster)
       if(L.cat) return v==null?"#16202c":(CLUB_COLOR[v]||"#3a4a5c");
       if(shapesOnly) return (m&&m._enclave)?"#8a6a24":"#1b2837";
-      return (v==null||isNaN(v))?"#16202c":scale(v);})
+      if(v==null||isNaN(v)) return "#16202c";
+      return flatMode ? scale((ext[0]+ext[1])/2) : scale(v);})
     .attr("fill-opacity",f=>f.properties._parent?0.26:1)
     .attr("stroke","none")
     .style("cursor","pointer")
@@ -746,12 +761,16 @@ function drawLegend(){
   }
   d3.select("#ltitle").text(L.label+(L.disabled?" — unavailable":""));
   d3.select("#ramp").style("background",
-    L.disabled?"#1b2634":`linear-gradient(90deg,${RAMP.join(",")})`);
+    L.disabled?"#1b2634":flatMode?scale((scale.domain()[0]+scale.domain()[1])/2)
+    :`linear-gradient(90deg,${RAMP.join(",")})`);
   const d=scale.domain();
   d3.select("#lscale").selectAll("span").data(L.disabled?["",""]:[L.fmt(d[0]),L.fmt(d[1])])
     .text(x=>x);
   const pv=PROV[L.prov(S.year)];
-  d3.select("#lnote").html(`<span class="pill ${pv[0]}">${pv[1]}</span> ${L.note(S.year)}`);
+  d3.select("#lnote").html(`<span class="pill ${pv[0]}">${pv[1]}</span> ${L.note(S.year)}`
+    +(flatMode?` <b>Shaded flat:</b> every value here is within
+       ${(flatSpread*100).toFixed(1)}% of the others, too close to rank by colour.
+       The figures are in the panel.`:""));
   d3.select("#yearflag").html(S.year==="2023"
     ? `<b>2023</b> census — official`
     : `<b>2026</b> projected — derived`);

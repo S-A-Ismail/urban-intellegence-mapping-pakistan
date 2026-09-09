@@ -133,7 +133,7 @@ the only edit needed. `census.json` still overrides per region for what-ifs.
 | City | Levels | Stats join |
 |---|---|---|
 | Karachi | districts (7) → towns (18) → neighbourhoods (454) | districts |
-| Lahore | tehsils (10) → localities (801) → neighbourhoods (191) | 5 of 10 |
+| Lahore | tehsils (5 census) → tehsils (10, 2024) → localities (801) → neighbourhoods (191) | the 5 census |
 | Peshawar | territories (4) → tehsils (7) → neighbourhoods (5) | territories |
 | Multan | tehsils (4) | tehsils |
 | Islamabad | ICT whole → neighbourhoods (32) | whole city |
@@ -174,6 +174,17 @@ approximated.
 
 Map labels are collision-filtered in screen space under the live zoom, so
 zooming reveals more. The pass re-runs 140ms after the zoom settles.
+
+**Choropleth guard:** where every value in view sits within 5% of the others the
+layer is shaded flat, with the spread stated in the legend, rather than letting a
+linear ramp stretch a rounding difference across the whole palette. It fires on
+household size in Lahore (3.2%), Multan (0%) and Islamabad (0%); Karachi's
+tightest layer is 17% so nothing there is affected.
+
+**Club colours:** Karachi's four are deliberately left alone. Lahore's three were
+three adjacent stops off the sequential ramp — near-identical teals, the darkest
+invisible once shaded back to 26% for a parent territory — and are now separated
+across the hue wheel (`#2fb8f0`, `#8b5cf6`, `#34d399`).
 
 **Export:** the panel has a Download CSV button. It exports exactly what is on
 screen — current city, level and year, one row per drawn shape — with every
@@ -266,7 +277,7 @@ Territory composition: Karachi 7 districts · Lahore 5 census tehsils · Multan 
 - **Chrome will not install in this sandbox** — no headless render check. Verify JS by parsing it in Node and testing the data layer directly.
 - **Karachi district polygons** are crosswalked from a 2022 town layer. Total area within 10% of census; four districts vary individually (East +47%, West −47%, Malir +27%, South −20%). Disclosed per district in the map UI.
 - **Lahore tehsil polygons are derived**, not official. Built by matching the 2024 notification's revenue estates to locality points (167 of 801 matched), filling by nearest neighbour, then 9-NN majority smoothing.
-- **Lahore's ten tehsils are a different administrative vintage from the five the model prices.** They partition the same district, so a same-named outline is a *fraction* of its census unit — post-2024 Shalimar measures 23 km² against census Shalimar's 272 km² (−91%). Statistics shown are exact for the census tehsil; the outline is not that tehsil. The map labels this `vintage` and says so. The five 2024 tehsils with no census counterpart carry no statistics.
+- **Lahore has two tehsil layers.** `lahore_census_tehsils` (5, OSM, admin_level 7) are the 2023 census units the model prices and match census area within 2% overall; everything joined to census or dealership data uses them. `lahore_tehsils` (10, derived) are the 2024 notification units — a different vintage, where a same-named outline is a *fraction* of its census unit (post-2024 Shalimar 23 km² against 272 km², −91%). They are a shapes-only level. Joining the census figures to the derived ten was the earlier behaviour and left **59% of Lahore undrawn**, because only five of the ten names collide.
 - **Peshawar's source admin layer uses the old Town-I..IV structure**, which does not crosswalk to the model's territories. The map uses OSM's current seven tehsils, which carry the model's own names, unioned into the four groups. Peshawar City +51% and East Ring −38% against census area; the four-territory total is within 6%.
 - **Islamabad cannot be split geographically.** ICT is one district and the urban/rural split is a census classification, not a published boundary. No open source has it, OSM included. Both territories are listed against the whole-city shape.
 - **Assumptions rows carry no column-A label directly under each section header** — the anchor territory, pump price, S-tier multiplier, first weight and Ramp Q1 all sit in a bare B cell. `refresh.py` reads these with an `above(label)` helper anchored to the next label down, never a fixed row number.

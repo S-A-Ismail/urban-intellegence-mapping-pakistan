@@ -226,7 +226,7 @@ as the city's regions appear in `CensusBase`. No logic needs rewriting.
 | City | Levels | Statistics join | Note |
 |---|---|---|---|
 | Karachi | districts (7) → towns (18) → neighbourhoods (454) | districts | towns and neighbourhoods are shapes only |
-| Lahore | tehsils (10) → localities (801) → neighbourhoods (191) | 5 of 10 tehsils | see the vintage warning below |
+| Lahore | tehsils (5 census) → tehsils (10, 2024) → localities (801) → neighbourhoods (191) | the 5 census tehsils | the 2024 ten are shapes only |
 | Peshawar | territories (4) → tehsils (7) → neighbourhoods (5) | territories | groups built by unioning OSM tehsils |
 | Multan | tehsils (4) | tehsils | no OSM neighbourhood layer exists |
 | Islamabad | ICT (whole) → neighbourhoods (32) | whole city | the urban/rural split is not a boundary |
@@ -238,12 +238,13 @@ as the city's regions appear in `CensusBase`. No logic needs rewriting.
 - **Karachi district shapes** are crosswalked from a 2022 town layer. Total area
   is within 10% of census, but four districts vary individually (East +47%,
   West −47%, Malir +27%, South −20%). Statistics are exact; shapes approximate.
-- **Lahore tehsil shapes are a different administrative vintage.** The ten 2024
-  tehsils partition the same district as the five 2023 census tehsils, so a
-  same-named outline is a *fraction* of its census unit — post-2024 Shalimar is
-  23 km² against the census unit's 272 km². The figures shown are exact for the
-  census tehsil; the outline is not that tehsil. The five 2024 tehsils with no
-  census counterpart carry no statistics at all.
+- **Lahore has two tehsil layers, and only one carries statistics.** The five
+  2023 census tehsils come from OpenStreetMap and match the census areas within
+  2% overall (−6% to +9% each); everything joined to census or dealership data
+  uses them. The ten 2024-notification tehsils are a different administrative
+  vintage — a same-named outline is a *fraction* of its census unit, post-2024
+  Shalimar being 23 km² against 272 km² — so they are kept as their own level
+  and carry no statistics.
 - **Peshawar territories** are unioned from OSM's seven tehsils. The OSM line
   between Peshawar City and the East Ring differs from the census one
   (+51% and −38%), though the four-territory total is within 6%.
@@ -259,3 +260,8 @@ as the city's regions appear in `CensusBase`. No logic needs rewriting.
   priced on, because Sahil has no open boundary.
 - **Enclave house counts are estimates**, not census figures — they come from the
   model's own assumptions and are labelled as such.
+- **Near-uniform layers are shaded flat.** Where every value sits within 5% of
+  the others — Lahore's household sizes run 6.3 to 6.5, Multan's are all 6.05 —
+  a linear ramp would stretch a rounding difference across the whole palette and
+  make it look dramatic. Those layers render in one shade with the spread stated
+  in the legend. Anything with a real spread is unaffected.

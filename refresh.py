@@ -269,7 +269,7 @@ GEO = json.load(open(p("pakistan_urban_geo.json")))
 GEO_LAYER = {"Karachi": ("karachi_districts", "crosswalk"),
              "Multan":  ("multan_tehsils",   "match"),
              "Peshawar": ("peshawar_groups", "source"),
-             "Lahore":  ("lahore_tehsils",   "vintage")}
+             "Lahore":  ("lahore_census_tehsils", "match")}
 VAR, VKIND = {}, {}
 for city, (layer, kind) in GEO_LAYER.items():
     for ft in GEO.get(layer, {}).get("features", []):
@@ -394,11 +394,10 @@ CITY_NOTE = {
  "Multan":    "Four tehsils, names matching the census exactly. No OSM "
               "neighbourhood layer exists for Multan, so the drill-down stops "
               "at tehsil.",
- "Lahore":    "Population figures are for the five 2023 census tehsils. The "
-              "shapes drawn are the ten 2024-notification tehsils, which "
-              "partition the same district — so a same-named polygon is a "
-              "fraction of its census unit. Figures are exact for the census "
-              "tehsil; the outline is not that tehsil.",
+ "Lahore":    "Five census tehsils, drawn from OpenStreetMap and matching the "
+              "census areas within 2% overall. The ten 2024-notification "
+              "tehsils are a different administrative vintage and are kept as "
+              "their own level; they carry no statistics.",
  "Karachi":   "Seven districts crosswalked from a 2022 town layer. Total area "
               "within 10% of census; four districts vary individually.",
 }

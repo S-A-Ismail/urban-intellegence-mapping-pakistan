@@ -280,6 +280,35 @@ for t, lst in grp.items():
         "method":"derived"}, 0.0013))
 out["lahore_tehsils"] = FC(tf)
 
+# ------------------------------------- lahore, the five census tehsils -------
+# The model prices the five 2023 census tehsils. The derived layer above is the
+# ten 2024-notification tehsils — a different administrative vintage, and only
+# five of its names collide with the census ones, which left 59% of Lahore
+# undrawn whenever the map grouped by census unit. OSM carries the five census
+# tehsils as real boundaries, so those are used for anything joined to census or
+# dealership data; the derived ten stay available as their own level.
+LHE_CENSUS = {"Lahore City Tehsil": "Lahore City",
+              "Model Town Tehsil": "Model Town",
+              "Shalimar Tehsil": "Shalimar",
+              "Lahore Cantonment Tehsil": "Lahore Cantt",
+              "Raiwind Tehsil": "Raiwind"}
+lhe = overpass("lahore_census_tehsils", """
+[out:json][timeout:300];
+(relation["boundary"="administrative"]["admin_level"="7"](31.20,74.00,31.80,74.75););
+out geom;""")
+lf = []
+for e in lhe["elements"]:
+    n = osm_name(e)
+    if n not in LHE_CENSUS:
+        continue
+    g = osm_geom(e)
+    if g is None:
+        continue
+    lf.append(feat(g, {"name": LHE_CENSUS[n], "level": "tehsil", "city": "Lahore",
+                       "source": "osm", "vintage": "2023 census"}, 0.0012))
+out["lahore_census_tehsils"] = FC(lf)
+print("   lahore census tehsils: %d of 5" % len(lf))
+
 # ------------------------------------------------------------------ multan ---
 # The four tehsils carry exactly the names the model prices.
 mux = by_district("Multan")
