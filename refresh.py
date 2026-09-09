@@ -402,6 +402,13 @@ CITY_NOTE = {
               "within 10% of census; four districts vary individually.",
 }
 
+# dealership_clusters.json is the naming authority for what a dealership is
+# called. DealerStructure carries its own labels, and letting both through would
+# show one name on the cluster card and a different one on the structure card.
+for _c in CLUSTERS:
+    if _c["code"] in DEALERS and _c.get("name"):
+        DEALERS[_c["code"]]["name"] = _c["name"]
+
 DATA = dict(regions=REGIONS, hyper=HYPER, cities=CITIES, dealers=DEALERS,
             meta=META, var=VAR, vkind=VKIND, city_pt=CITY_PT,
             city_note=CITY_NOTE, enclave=ENCLAVE,

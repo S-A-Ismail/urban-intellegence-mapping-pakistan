@@ -326,13 +326,13 @@ const LVKIND={crosswalk:"crosswalked from an older layer",
    The commercial grouping, from dealership_clusters.json. An area with no open
    outline is still listed in the panel and simply cannot be drawn. */
 const CLUSTERS=D.clusters||[];
-/* Karachi's four are left as they are. Lahore's three were three adjacent
-   stops off the sequential ramp — #5aa8a0, #2a8296, #1c5c78 — near-identical
-   teals, and the darkest all but vanished once a parent territory was shaded
-   back to 26%. They are now separated across the hue wheel. */
-const CLUB_COLOR={"KHI-1":"#e2683c","KHI-2":"#f0a94e","KHI-3":"#dfd97a",
- "KHI-4":"#9fc78e","LHE-1":"#2fb8f0","LHE-2":"#8b5cf6","LHE-3":"#34d399",
- "MUX-1":"#a98fd8","PEW-1":"#d47fb0","ISB-1":"#6f9fd8"};
+/* Saturated enough to hold up at the 26% opacity a parent territory is shaded
+   at. Each city's own set is spread as far around the hue wheel as it has
+   members, since only one city's dealerships are ever on screen at once —
+   Karachi reads red / orange / yellow / green, Lahore cyan / violet / mint. */
+const CLUB_COLOR={"KHI-1":"#ff4d3d","KHI-2":"#ff9500","KHI-3":"#ffe83d",
+ "KHI-4":"#5ee88a","LHE-1":"#29c5ff","LHE-2":"#b47cff","LHE-3":"#22e39b",
+ "MUX-1":"#ff6ad5","PEW-1":"#ff5c8a","ISB-1":"#5b9dff"};
 function clustersOf(city){return CLUSTERS.filter(c=>c.city===city);}
 
 /* The polygons that make up a dealership's parent territory — the census
@@ -491,6 +491,7 @@ const gCtx=gRoot.append("g"), gFill=gRoot.append("g"), gLine=gRoot.append("g"),
       gPt=gRoot.append("g"), gLab=gRoot.append("g");
 let W=0,H=0,proj,path,labelsAlways=false,shapesOnly=false,relabel=null,
     flatMode=false,flatSpread=0;
+const LBL_P=13, LBL_A=11.5;   // dealership label, area label
 const RAMP=["#12202e","#173c55","#1c5c78","#2a8296","#5aa8a0","#9fc78e","#dfd97a","#f0a94e","#e2683c"];
 const scale=d3.scaleSequential(t=>d3.interpolateRgbBasis(RAMP)(t));
 function size(){const r=document.getElementById("stage").getBoundingClientRect();
@@ -502,7 +503,10 @@ const zoom=d3.zoom().scaleExtent([1,140]).on("zoom",e=>{
   gCtx.attr("stroke-width",.7/e.transform.k);
   gLab.attr("opacity",labelsAlways?.9:
         e.transform.k>2.2?1:e.transform.k>1.3?.72:0)
-      .selectAll("text").attr("font-size",(10.5/Math.pow(e.transform.k,.72))+"px");
+      .selectAll("text")
+      // scale each from its own base, or zooming flattens the dealership label
+      // and the area label to the same size
+      .attr("font-size",d=>((d&&d.parent?LBL_P:LBL_A)/Math.pow(e.transform.k,.72))+"px");
   // re-run the label collision once the user stops, so zooming reveals more
   clearTimeout(relabel);
   relabel=setTimeout(()=>{if(proj) draw(false);},140);
@@ -758,21 +762,30 @@ function draw(recentre){
 
   const lab=gLab.selectAll("text").data(labels,d=>d.key);
   lab.exit().remove();
+  // White and bold on a heavy dark halo. Coloured label text sat on top of a
+  // territory shaded in the same hue and was the hardest thing on the map to
+  // read; the shape already carries the colour, so the text does not need to.
   const labAll=lab.enter().append("text")
       .attr("text-anchor","middle").attr("pointer-events","none")
-      .attr("paint-order","stroke").attr("stroke","#0b0f14").attr("stroke-width",2.4)
+      .attr("paint-order","stroke").attr("stroke","#05080c")
+      .attr("stroke-linejoin","round")
     .merge(lab)
+      .attr("stroke-width",d=>d.parent?3.6:3)
       .attr("x",d=>path.centroid(d.geo)[0]).attr("y",d=>path.centroid(d.geo)[1])
-      .attr("fill",d=>d.parent?(CLUB_COLOR[d.club]||"#e6edf3"):"#e6edf3")
-      .attr("font-size",d=>d.parent?"12px":"10.5px")
-      .attr("font-weight",d=>d.sub?600:400)
-      .attr("letter-spacing",d=>d.parent?".4px":null);
+      .attr("fill","#ffffff")
+      .attr("font-size",d=>(d.parent?LBL_P:LBL_A)+"px")
+      .attr("font-weight",700)
+      .attr("letter-spacing",d=>d.parent?".5px":".2px");
   labAll.selectAll("tspan").remove();
   labAll.append("tspan").attr("x",d=>path.centroid(d.geo)[0]).text(d=>d.text);
   labAll.filter(d=>d.sub).append("tspan")
-      .attr("x",d=>path.centroid(d.geo)[0]).attr("dy","1.15em")
-      .attr("font-size",".82em").attr("font-weight",400)
-      .attr("fill",d=>d.parent?"#8b9bab":(CLUB_COLOR[d.club]||"#8b9bab"))
+      .attr("x",d=>path.centroid(d.geo)[0]).attr("dy","1.2em")
+      .attr("font-size",".84em").attr("font-weight",600)
+      // Neutral, not the club colour: the second line sits on top of a premium
+      // area painted in that very colour, and green-on-green was the least
+      // legible thing on the map. The shape carries the colour; the text does
+      // not need to repeat it.
+      .attr("fill","#e3ebf3")
       .text(d=>d.sub);
   gLab.attr("opacity",labelsAlways?.9:fs.length>40?0:.8);
 

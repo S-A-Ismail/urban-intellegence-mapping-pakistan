@@ -200,10 +200,26 @@ linear ramp stretch a rounding difference across the whole palette. It fires on
 household size in Lahore (3.2%), Multan (0%) and Islamabad (0%); Karachi's
 tightest layer is 17% so nothing there is affected.
 
-**Club colours:** Karachi's four are deliberately left alone. Lahore's three were
-three adjacent stops off the sequential ramp — near-identical teals, the darkest
-invisible once shaded back to 26% for a parent territory — and are now separated
-across the hue wheel (`#2fb8f0`, `#8b5cf6`, `#34d399`).
+**Club colours** are saturated enough to hold up at the 26% opacity a parent
+territory is shaded at. Only one city's dealerships are ever on screen at once,
+so each city's set is spread as far around the hue wheel as it has members —
+Karachi reads red / orange / yellow / green, Lahore cyan / violet / mint.
+
+**Map labels** are white, bold (700) on a heavy dark halo, sized from `LBL_P`
+(dealership) and `LBL_A` (area); the zoom handler scales each from its own base,
+or zooming flattens the two to one size. The second line is a neutral
+`#e3ebf3` rather than the club colour, because it sits on a premium area painted
+in that very colour and green-on-green was the least legible thing on the map.
+The shape carries the colour; the text does not repeat it.
+
+**Dealership names** come from `dealership_clusters.json`, which `refresh.py`
+copies over the DealerStructure labels so the cluster card, the structure card
+and the selection detail cannot disagree. Lahore was renamed to Karachi's
+convention of naming the territories covered — LHE-1 *Cantt & Raiwind*, LHE-2
+*City & Shalimar*, LHE-3 *Model Town* — replacing compass names that repeated
+the city and, in LHE-3's case, pointed the wrong way: "West Lahore" was the
+Model Town tehsil in the centre-south. The **codes are unchanged**, so anything
+contractual keyed on LHE-1/2/3 still matches.
 
 **Export:** the panel has a Download CSV button. It exports exactly what is on
 screen — current city, level and year, one row per drawn shape — with every

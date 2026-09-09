@@ -64,7 +64,7 @@
       ]
     },
     {
-      "code": "LHE-1", "proposed_fee_pkr": 15000000, "name": "South Lahore", "city": "Lahore",
+      "code": "LHE-1", "proposed_fee_pkr": 15000000, "name": "Cantt & Raiwind", "city": "Lahore",
       "premium": true,
       "areas": [
         {"label": "DHA Lahore I-VI", "prefixes": ["DHA Phase 1", "DHA Phase 2", "DHA Phase 3", "DHA Phase 4", "DHA Phase 5", "DHA Phase 6"]},
@@ -78,7 +78,7 @@
       ]
     },
     {
-      "code": "LHE-2", "proposed_fee_pkr": 10000000, "name": "Central Lahore", "city": "Lahore",
+      "code": "LHE-2", "proposed_fee_pkr": 10000000, "name": "City & Shalimar", "city": "Lahore",
       "premium": false,
       "note": "No designated premium cluster. The areas below are representative localities in the central tehsils, taken from the Lahore locality layer — not a premium grouping.",
       "areas": [
@@ -97,7 +97,7 @@
       ]
     },
     {
-      "code": "LHE-3", "proposed_fee_pkr": 10000000, "name": "West Lahore", "city": "Lahore",
+      "code": "LHE-3", "proposed_fee_pkr": 10000000, "name": "Model Town", "city": "Lahore",
       "premium": true,
       "areas": [
         {"label": "Gulberg I-V", "prefixes": ["Gulberg"]},
