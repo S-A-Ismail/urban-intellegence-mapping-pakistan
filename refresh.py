@@ -7,27 +7,34 @@ Run it from this folder:
     python refresh.py
 
 No dependencies. It reads the cached values Excel stores in the workbook, so
-openpyxl is no longer needed.
+openpyxl is not needed.
 
-It reads whatever is sitting next to it:
     map_template.html         the UI (edit this to change look or behaviour)
     pakistan_urban_geo.json   the boundaries (rarely changes)
-    Dealership_Model.xlsx     the model — all 29 territories, five cities
+    Dealership_Model.xlsx     the model
     census.json               optional — override any census figure
 
 and writes:
     pakistan_urban_map.html
 
-Everything the map shows comes from the workbook. There are no census figures
-hardcoded here any more: change an assumption in Dealership_Model.xlsx, run this,
-and the map follows.
+SCOPE — this map is a geography and population tool.
 
-If the workbook is missing it falls back to scenario_a.json.
+No fee, price, quota, pump-point, revenue or profit figure is read from the
+workbook or written into the page. Suppressing them in the UI alone would be
+false secrecy: the numbers would still sit in the page source for anyone who
+opened it. They are therefore never extracted at all.
+
+The only thing taken from the commercial side of the model is the *structure* —
+which dealership club each territory belongs to, and the ten clubs listed on the
+DealerStructure sheet. Those sheets also carry fees and revenue; none of those
+columns are read. See CHECK_FORBIDDEN at the bottom, which fails the build if a
+money figure ever reaches the output.
 """
 import json, sys, os, re, zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 p = lambda *a: os.path.join(HERE, *a)
+
 
 # ------------------------------------------------------- minimal xlsx reader --
 # Excel caches the computed value of every formula inside the sheet XML. That is
@@ -91,60 +98,27 @@ num = lambda v: float(v) if isinstance(v, (int, float)) else 0.0
 r0 = lambda v: round(num(v))
 r2 = lambda v, d=2: round(num(v), d)
 
-# --------------------------------------------------------------- read the model
 XL = p("Dealership_Model.xlsx")
-REGIONS, HYPER, CITIES, META = {}, {}, {}, {}
+REGIONS, HYPER, CITIES, DEALERS, META = {}, {}, {}, {}, {}
 src = "none"
 
 
 def read_workbook(path):
     b = Book(path)
 
-    # --- Assumptions: read by label, never by hardcoded row (rows shift)
+    # --- Assumptions: only the growth cap, which the projection note needs.
+    #     Read by label; the first input under each section header carries no
+    #     column-A label of its own, so anchoring off a fixed row would break.
     A = b.sheet("Assumptions")
-    lab, lrow = {}, {}
+    lab = {}
     for ref, v in A.items():
         if ref.startswith("A") and isinstance(v, str):
-            row = int(ref[1:])
-            lab[v.strip()] = A.get("B%d" % row)
-            lrow[v.strip()] = row
-    g = lambda k, d=None: lab.get(k, d)
+            lab[v.strip()] = A.get("B%d" % int(ref[1:]))
+    meta = dict(growth_cap=num(lab.get("Growth rate cap")),
+                base_year="2026", census_year="2023", prev_census="2017")
 
-    def above(label):
-        """Value one row above a labelled row.
-
-        The first input under each section header carries no label of its own —
-        the anchor territory, the pump price, the S-tier multiplier and so on all
-        sit in a bare B cell. Anchoring off the next label down keeps this
-        row-shift safe, which reading a fixed row number would not be.
-        """
-        r = lrow.get(label)
-        return A.get("B%d" % (r - 1)) if r else None
-    meta = dict(
-        anchor_on=above("Scenario A: anchor fee (PKR)"),
-        anchor_fee=num(g("Scenario A: anchor fee (PKR)")),
-        alt_on=g("Scenario B: anchor on"),
-        alt_fee=num(g("Scenario B: anchor fee (PKR)")),
-        active=g("Active scenario for Economics & Visuals"),
-        rate=num(g("Active rate (PKR per Fee Unit)")),
-        rate_a=num(g("Scenario A rate (PKR per Fee Unit)")),
-        rate_b=num(g("Scenario B rate (PKR per Fee Unit)")),
-        pump_price=num(above("Dealer gross margin")),
-        margin=num(g("Dealer gross margin")),
-        term=num(g("Dealership term (years)")),
-        pump_life=num(g("Average pump life (years)")),
-        inv_credit=num(g("Inventory credit (fraction of fee)")),
-        growth_cap=num(g("Growth rate cap")),
-        pumps_per_house=num(above("Flats per booster set")),
-        flats_per_set=num(g("Flats per booster set")),
-        whole_city=num(g("Whole-city exclusivity premium")),
-        asp=dict(S=num(above("ASP A — Premium")), A=num(g("ASP A — Premium")),
-                 B=num(g("ASP B — Upper-mid")), C=num(g("ASP C — Mass"))),
-        tier_share=dict(S=num(above("Share A — Premium")), A=num(g("Share A — Premium")),
-                        B=num(g("Share B — Upper-mid")), C=num(g("Share C — Mass"))),
-    )
-
-    # --- CensusBase: the 22 official regions
+    # --- CensusBase: the 22 official regions. Geography and population only —
+    #     the ASP tier and house share are pricing inputs and are not read.
     regions = {}
     r = 6
     while True:
@@ -155,9 +129,7 @@ def read_workbook(path):
         regions[name] = dict(
             city=b.cell("CensusBase", 1, r), kind="region",
             area=r2(c(3), 1), pop17=r0(c(4)), pop23=r0(c(5)),
-            hh_size=r2(c(6)), house_share=r2(c(7), 3), tier=c(8),
-            growth_raw=r2(c(9), 5), growth=r2(c(10), 5), spp_factor=r2(c(11), 4),
-        )
+            hh_size=r2(c(6)), growth_raw=r2(c(9), 5), growth=r2(c(10), 5))
         r += 1
 
     # --- Projection: population and households, 2023 to 2030
@@ -185,68 +157,56 @@ def read_workbook(path):
             hh={str(2023 + i): r0(b.cell("Projection", 10 + i, r)) for i in range(8)})
         r += 1
 
-    # --- PumpPoints / FeeSchedule / Quotas / Economics: all 29 territories
+    # --- PumpPoints, columns B and E only: the territory list and which
+    #     dealership club each belongs to. Nothing else on this sheet is read.
     hyper = {}
     r = 6
     while True:
-        name = b.cell("FeeSchedule", 2, r)
+        name = b.cell("PumpPoints", 2, r)
         if not isinstance(name, str) or not name.strip() or name.upper().startswith("TOTAL"):
             break
-        f = lambda col: b.cell("FeeSchedule", col, r)
-        pp = lambda col: b.cell("PumpPoints", col, r)
-        q = lambda col: b.cell("Quotas", col, r)
-        e = lambda col: b.cell("Economics", col, r)
-        rec = dict(
-            city=f(1), typ=f(3), tier=f(4), club=f(5),
-            units=r2(f(6), 3), share=r2(f(7), 5),
-            feeA=r0(f(8)), feeB=r0(f(10)), fee=r0(f(12)), inv=r0(f(13)),
-            spp18=r0(pp(8)), spp=r0(pp(9)), spp30=r0(pp(10)),
-            newbuild=r0(pp(11)), repl=r0(pp(12)), asp=r2(pp(13)),
-            rpp=r0(pp(14)),
-            addressable=r0(q(5)), gshare=r2(q(6), 4),
-            quota_yr=r0(q(7)), quota=r0(q(8)), y1=r0(q(13)),
-            outlay=r0(e(6)), fee_yr=r0(e(7)),
-            topline=r0(e(9)), gross=r0(e(10)), bottom=r0(e(11)),
-            payback=r2(e(12), 1), cum4=r0(e(13)), roi=r2(e(14), 2),
-        )
+        club = b.cell("PumpPoints", 5, r)
         if name in regions:
-            regions[name].update(rec)
-        else:                                    # a carved-out hyper market
-            rec["kind"] = "hyper"
-            rec["area"] = r2(pp(6), 1)
-            rec["hh26"] = r0(pp(7))
-            hyper[name] = rec
+            regions[name]["club"] = club
+            regions[name]["area_net"] = r2(b.cell("PumpPoints", 6, r), 1)
+        else:
+            hyper[name] = dict(kind="hyper", club=club,
+                               area=r2(b.cell("PumpPoints", 6, r), 1))
         r += 1
 
-    # --- HyperMarkets: parent and estimated house count
+    # --- HyperMarkets: the enclave's city, parent and estimated house count.
+    #     Columns E-I (pump points, fees) are not read.
     r = 6
     while True:
         name = b.cell("HyperMarkets", 1, r)
         if not isinstance(name, str) or not name.strip() or name.upper().startswith("TOTAL"):
             break
         if name in hyper:
-            hyper[name].update(parent=b.cell("HyperMarkets", 3, r),
-                               houses=r0(b.cell("HyperMarkets", 6, r)),
-                               growth=r2(b.cell("HyperMarkets", 7, r), 4))
+            hyper[name].update(city=b.cell("HyperMarkets", 2, r),
+                               parent=b.cell("HyperMarkets", 3, r),
+                               houses=r0(b.cell("HyperMarkets", 6, r)))
         r += 1
 
-    # PumpPoints carries the carve-out-net area and households for regions too
+    # --- DealerStructure, columns A-D only: the ten clubs and how many
+    #     territories each covers. Columns E-K hold pump points, fees, quota and
+    #     revenue and are deliberately skipped.
+    dealers = {}
     r = 6
     while True:
-        name = b.cell("PumpPoints", 2, r)
-        if not isinstance(name, str) or not name.strip() or name.upper().startswith("TOTAL"):
+        code = b.cell("DealerStructure", 1, r)
+        if not isinstance(code, str) or not code.strip():
             break
-        if name in regions:
-            regions[name]["area_net"] = r2(b.cell("PumpPoints", 6, r), 1)
-            regions[name]["hh26"] = r0(b.cell("PumpPoints", 7, r))
+        dealers[code] = dict(name=b.cell("DealerStructure", 2, r),
+                             city=b.cell("DealerStructure", 3, r),
+                             territories=r0(b.cell("DealerStructure", 4, r)))
         r += 1
 
-    return regions, hyper, cities, meta
+    return regions, hyper, cities, dealers, meta
 
 
 if os.path.exists(XL):
     try:
-        REGIONS, HYPER, CITIES, META = read_workbook(XL)
+        REGIONS, HYPER, CITIES, DEALERS, META = read_workbook(XL)
         src = "Dealership_Model.xlsx"
     except Exception as ex:
         print("! could not read workbook (%s)" % ex)
@@ -254,20 +214,19 @@ if os.path.exists(XL):
 if not REGIONS and os.path.exists(p("scenario_a.json")):
     cached = json.load(open(p("scenario_a.json")))
     REGIONS = cached.get("regions", {}); HYPER = cached.get("hyper", {})
-    CITIES = cached.get("cities", {});   META = cached.get("meta", {})
+    CITIES = cached.get("cities", {});   DEALERS = cached.get("dealers", {})
+    META = cached.get("meta", {})
     src = "scenario_a.json"
 
 if REGIONS:
-    json.dump(dict(regions=REGIONS, hyper=HYPER, cities=CITIES, meta=META),
+    json.dump(dict(regions=REGIONS, hyper=HYPER, cities=CITIES,
+                   dealers=DEALERS, meta=META),
               open(p("scenario_a.json"), "w"), indent=0)
 
-print("· model data: %s (%d regions + %d hyper markets, %d cities)"
-      % (src, len(REGIONS), len(HYPER), len(CITIES)))
-if META.get("anchor_on"):
-    print("· anchor: scenario %s — %s at Rs %s (rate PKR %s / Fee Unit)"
-          % (META.get("active"), META["anchor_on"],
-             "{:,.2f} Cr".format(META["anchor_fee"] / 1e7),
-             "{:,.0f}".format(META.get("rate", 0))))
+print("· model data: %s (%d regions + %d enclaves, %d cities, %d dealerships)"
+      % (src, len(REGIONS), len(HYPER), len(CITIES), len(DEALERS)))
+print("· scope: geography and population only — no fee, quota or revenue figure "
+      "is read from the workbook")
 
 # ------------------------------------------------------------ census overrides
 if os.path.exists(p("census.json")):
@@ -283,7 +242,7 @@ for f in ("map_template.html", "pakistan_urban_geo.json"):
         sys.exit("! missing %s — it must sit next to refresh.py" % f)
 GEO = json.load(open(p("pakistan_urban_geo.json")))
 
-# Where a polygon is drawn for a priced territory, measure it against the census
+# Where a polygon is drawn for a census region, measure it against the census
 # area and carry the gap so the UI can disclose it. Statistics stay exact; only
 # the shapes are approximate.
 #
@@ -312,10 +271,10 @@ for city, (layer, kind) in GEO_LAYER.items():
             VAR[nm] = round((drawn - reg["area"]) / reg["area"] * 100)
             VKIND[nm] = kind
 
-# --------------------------------------------- priced enclaves -> OSM outlines
-# The model prices seven carved-out enclaves. OSM draws some of them and not
-# others, and where it draws only part of one the shortfall is measured and
-# carried so the UI can say so instead of implying the outline is the territory.
+# --------------------------------------------- named enclaves -> OSM outlines
+# The model carves out seven enclaves. OSM draws some of them and not others,
+# and where it draws only part of one the shortfall is measured and carried so
+# the UI can say so instead of implying the outline is the whole enclave.
 ENCLAVE_GEO = {
  "DHA Phase VIII + Sahil":         ("Karachi",  ["DHA Phase 8", "DHA Phase 8 Extension"]),
  "Bahria Town Karachi":            ("Karachi",  ["Bahria Town Karachi",
@@ -330,7 +289,7 @@ AREA_IX = {}
 for ft in GEO.get("city_areas", {}).get("features", []):
     q = ft["properties"]
     AREA_IX[(q["city"], q["name"])] = q.get("area_km2") or 0
-ENCLAVE = {}                      # osm feature -> priced territory it belongs to
+ENCLAVE = {}
 for terr, (city, names) in ENCLAVE_GEO.items():
     drawn = sum(AREA_IX.get((city, n), 0) for n in names)
     model_area = (HYPER.get(terr) or {}).get("area")
@@ -342,36 +301,54 @@ for terr, (city, names) in ENCLAVE_GEO.items():
         HYPER[terr]["geo_cover"] = (round(drawn / model_area * 100)
                                     if model_area and drawn else 0)
 
-# which cities have a real sub-region split, and which are sold whole
 CITY_PT = {"Karachi": [67.01, 24.86], "Lahore": [74.34, 31.55],
            "Islamabad": [73.06, 33.68], "Peshawar": [71.55, 34.01],
            "Multan": [71.48, 30.18]}
-CITY_GEO = {"Karachi": "karachi_districts", "Lahore": "lahore_tehsils",
-            "Multan": "multan_tehsils", "Peshawar": "peshawar_groups",
-            "Islamabad": "islamabad_district"}
-CITY_SUB = {"Karachi": "karachi_towns", "Lahore": "lahore_localities"}
 CITY_NOTE = {
- "Islamabad": "ICT is a single district. The model's urban/rural split follows "
-              "the census classification, which is not a published boundary, so "
-              "both territories are listed against the whole-city shape.",
- "Peshawar":  "Seven OSM tehsils unioned into the model's four commercial "
-              "territories. The OSM line between Peshawar City and the East Ring "
-              "differs from the census one — statistics are exact, shapes vary.",
- "Multan":    "Four tehsils, names matching the model exactly. No OSM "
+ "Islamabad": "ICT is a single district. The census urban/rural split the model "
+              "uses is a classification, not a published boundary, so the whole "
+              "city is drawn as one shape.",
+ "Peshawar":  "Seven OSM tehsils unioned into four groups. The OSM line between "
+              "Peshawar City and the East Ring differs from the census one — "
+              "statistics are exact, shapes vary.",
+ "Multan":    "Four tehsils, names matching the census exactly. No OSM "
               "neighbourhood layer exists for Multan, so the drill-down stops "
               "at tehsil.",
- "Lahore":    "The model prices the five 2023 census tehsils. The shapes drawn "
-              "are the ten 2024-notification tehsils, which partition the same "
-              "district — so a same-named polygon is a fraction of its census "
-              "unit. Figures are exact for the census tehsil; the outline is "
-              "not that tehsil.",
+ "Lahore":    "Population figures are for the five 2023 census tehsils. The "
+              "shapes drawn are the ten 2024-notification tehsils, which "
+              "partition the same district — so a same-named polygon is a "
+              "fraction of its census unit. Figures are exact for the census "
+              "tehsil; the outline is not that tehsil.",
  "Karachi":   "Seven districts crosswalked from a 2022 town layer. Total area "
               "within 10% of census; four districts vary individually.",
 }
 
-DATA = dict(regions=REGIONS, hyper=HYPER, cities=CITIES, meta=META,
-            var=VAR, vkind=VKIND, city_pt=CITY_PT, city_geo=CITY_GEO,
-            city_sub=CITY_SUB, city_note=CITY_NOTE, enclave=ENCLAVE)
+DATA = dict(regions=REGIONS, hyper=HYPER, cities=CITIES, dealers=DEALERS,
+            meta=META, var=VAR, vkind=VKIND, city_pt=CITY_PT,
+            city_note=CITY_NOTE, enclave=ENCLAVE)
+
+# ------------------------------------------------------------- forbidden keys
+# A guard, not a formality. If a future edit reintroduces a commercial field the
+# build fails loudly rather than quietly publishing the fee schedule inside the
+# page source.
+FORBIDDEN = {"fee", "feea", "feeb", "units", "quota", "quota_yr", "topline",
+             "bottom", "gross", "payback", "spp", "spp18", "spp30", "rpp",
+             "outlay", "fee_yr", "cum4", "roi", "inv", "addressable", "asp",
+             "tier", "tier_share", "rate", "anchor_fee", "pump_price", "margin",
+             "newbuild", "repl", "share", "gshare", "y1", "house_share",
+             "spp_factor", "anchor_on", "alt_fee"}
+def check(node, trail="DATA"):
+    if isinstance(node, dict):
+        for k, v in node.items():
+            if str(k).lower() in FORBIDDEN:
+                sys.exit("! %s.%s is a commercial field — this map is geography "
+                         "and population only. Remove it from read_workbook()."
+                         % (trail, k))
+            check(v, trail + "." + str(k))
+    elif isinstance(node, list):
+        for v in node[:50]:
+            check(v, trail + "[]")
+check(DATA)
 
 html = open(p("map_template.html"), encoding="utf8").read()
 html = html.replace("__GEO__",  json.dumps(GEO,  separators=(",", ":")))

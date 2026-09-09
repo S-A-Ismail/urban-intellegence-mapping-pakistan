@@ -1,7 +1,14 @@
 # Pakistan Urban Intelligence Map — how to refresh it
 
-Five cities: **Karachi, Lahore, Islamabad, Peshawar, Multan** — 29 territories,
-10 dealerships, drawn from `Dealership_Model.xlsx`.
+Five cities: **Karachi, Lahore, Islamabad, Peshawar, Multan**, drawn from
+`Dealership_Model.xlsx`.
+
+**Scope: geography and population only.** No fee, price, quota, pump-point,
+revenue or profit figure appears in this map — and none is read from the
+workbook in the first place, so none sits in the page source either. The only
+thing taken from the commercial side of the model is which dealership covers
+which region. Safe to hand to anyone who should see population data but not
+pricing.
 
 ## Just viewing it
 
@@ -19,10 +26,16 @@ often serve the cached copy.
   neighbourhoods (Clifton, Defence, the DHA phases); Lahore reaches its 801
   localities; Multan stops at tehsil because no finer open boundary exists.
 - **Year** — every population, household and density layer switches between
-  **2023 census** (official) and **2026 projected** (derived, the model's
-  pricing base year). The provenance tag in the legend changes with it.
-- **Data layer** — six census layers, seven dealership-model layers, and three
-  deliberately disabled slots where no attributable dataset exists.
+  **2023 census** (official) and **2026 projected** (derived). The provenance
+  tag in the legend changes with it, and the panels no longer shift when you
+  toggle.
+- **Data layer** — nine census layers: population, density, growth, households,
+  new households, new-housing intensity, population added, household size, area.
+- **Download CSV** — bottom of the right panel. Exports exactly what is on
+  screen: current city, level and year, one row per shape, with every population
+  column plus the boundary-accuracy gap and its reason.
+- **Collapsible panels** — drawer handles at the map edges, or `[` and `]`, or
+  `f` to hide both for presenting. The map re-fits into the space.
 
 Select a territory and drop a level and the map **enlarges that territory** —
 this is how you get from Karachi South down to Clifton and Defence. The
@@ -32,8 +45,8 @@ breadcrumb shows what you are zoomed into and lets you clear it.
 
 ## Refreshing the numbers — the usual case
 
-You changed something in `Dealership_Model.xlsx` (an assumption, the anchor, a
-house-share) and want the map to show it.
+You changed a census figure or a growth assumption in `Dealership_Model.xlsx`
+and want the map to show it.
 
 ```
 python refresh.py
@@ -46,8 +59,8 @@ browser.
 You should see:
 
 ```
-· model data: Dealership_Model.xlsx (22 regions + 7 hyper markets, 5 cities)
-· anchor: scenario A — Islamabad at Rs 1.00 Cr (rate PKR 1,058,239 / Fee Unit)
+· model data: Dealership_Model.xlsx (22 regions + 7 enclaves, 5 cities, 10 dealerships)
+· scope: geography and population only — no fee, quota or revenue figure is read
 · geometry layers: provinces, karachi_towns, ...
 ✓ pakistan_urban_map.html rebuilt (1.00 MB)
 ```
@@ -58,13 +71,17 @@ You should see:
 |---|---|---|
 | `map_template.html` | yes | the UI — edit this to change look or behaviour |
 | `pakistan_urban_geo.json` | yes | the boundaries |
-| `Dealership_Model.xlsx` | no | the whole model — census, projections, fees, quotas, economics |
+| `Dealership_Model.xlsx` | no | census, projections, and the dealership grouping — nothing commercial |
 | `scenario_a.json` | no | fallback if the workbook is absent |
 | `census.json` | no | overrides for any census figure |
 
-Nothing is hardcoded in `refresh.py` any more. Every census figure, projection
-and commercial number comes from the workbook, so changing an assumption there
-is the only thing you need to do.
+Nothing is hardcoded in `refresh.py`. Every census figure and projection comes
+from the workbook, so changing an assumption there is the only thing you need to
+do.
+
+`refresh.py` ends with a `FORBIDDEN` key check. If an edit ever reintroduces a
+fee, quota or revenue field, the build fails with a message naming it rather
+than quietly publishing the fee schedule inside the page.
 
 ---
 
@@ -101,8 +118,10 @@ year, so a layer can be official in 2023 and derived in 2026.
 To change how far a city drills, edit `LEVELS`.
 
 **Units.** Standard units everywhere — grouped integers for counts, km² for
-area, /km² for density, % for rates. Money is the one exception and uses PKR
-Lakh and Crore, via the `money()` helper. Do not format money any other way.
+area, /km² for density, % for rates. There is no currency formatter, because the
+map carries no monetary figure.
+
+To add a CSV column, add a `[header, fn]` pair to `CSV_COLS`.
 
 ---
 
@@ -141,12 +160,11 @@ again, edit that file and re-run.
 ## Adding a city
 
 1. `rebuild_boundaries.py` — add the city's polygons as new keys in `out`.
-2. `refresh.py` — add it to `CITY_PT`, `CITY_GEO` and `CITY_NOTE`.
+2. `refresh.py` — add it to `CITY_PT` and `CITY_NOTE`.
 3. `map_template.html` — add an entry to `LEVELS`.
 
-The census, projection and commercial figures come from the workbook
-automatically as soon as the city's regions appear in `CensusBase`. No logic
-needs rewriting.
+The census and projection figures come from the workbook automatically as soon
+as the city's regions appear in `CensusBase`. No logic needs rewriting.
 
 ---
 
@@ -186,5 +204,5 @@ needs rewriting.
   picked out in gold, and the panel says what share of the priced area the
   outline actually covers — DHA Phase VIII's outline is 42% of the 38 km² it is
   priced on, because Sahil has no open boundary.
-- **Housing price, price growth and project counts** have no attributable open
-  dataset. Those layers are deliberately disabled rather than estimated.
+- **Enclave house counts are estimates**, not census figures — they come from the
+  model's own assumptions and are labelled as such.

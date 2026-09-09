@@ -92,7 +92,19 @@ Workbook sheets, in dependency order:
 Only **Assumptions** holds inputs (blue on yellow). Everything else is formulas. Row 41 selects the active scenario.
 
 ### Map
-Covers all five cities. 29 territories, census 2023 and projected 2026.
+Covers all five cities, census 2023 and projected 2026.
+
+**Scope: geography and population only.** The map carries no fee, price, quota,
+pump-point, revenue or profit figure. They are not suppressed in the UI — they
+are never extracted from the workbook, because hiding them in the interface
+while leaving them in the page source would be false secrecy. `refresh.py` ends
+with a `FORBIDDEN` key check that fails the build if a commercial field ever
+reaches the output.
+
+The only thing taken from the commercial side is the *structure*: which
+dealership club each region belongs to, and the ten clubs on the DealerStructure
+sheet (code, name, city, region count). That sheet's fee, quota and revenue
+columns are not read.
 
 | Path | Role |
 |---|---|
@@ -122,9 +134,23 @@ the only edit needed. `census.json` still overrides per region for what-ifs.
 Selecting a territory and dropping a level enlarges it — that is how you get
 from Karachi South to Clifton and Defence.
 
-**Units in the UI:** standard units everywhere (grouped integers, km², /km², %).
-Money is the sole exception and uses PKR Lakh and Crore via `money()`. Do not
-format money any other way.
+**Units in the UI:** standard units everywhere — grouped integers for counts,
+km² for area, /km² for density, % for rates. There is no currency formatter,
+because there is nothing to format with one. If a future change reintroduces
+money, it belongs in a separate internal build, not this one.
+
+**Layers:** population, density, growth, households, new households, new-housing
+intensity, population added, household size, area. Nine, all census-derived.
+
+**Export:** the panel has a Download CSV button. It exports exactly what is on
+screen — current city, level and year, one row per drawn shape — with every
+population column plus the boundary-accuracy gap and its reason, so a figure is
+never separated from its caveat.
+
+**Panels:** both side panels collapse. Drawer handles at the map edges, `[` and
+`]` individually, `f` for both. State persists in localStorage. They collapse by
+letting their grid column go to 0 and clipping — `display:none` would unplace the
+grid item and slide `#stage` into the collapsed column.
 
 ### Documents
 | Path | Role |
@@ -141,8 +167,7 @@ format money any other way.
 
 ```bash
 # after changing any assumption in the workbook
-pip install openpyxl
-python refresh.py                    # rebuilds pakistan_urban_map.html (~1s)
+python refresh.py                    # rebuilds pakistan_urban_map.html (~1s), no deps
 
 # rebuild the workbook itself from source
 python model/build_xlsx2.py
