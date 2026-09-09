@@ -59,9 +59,11 @@ often serve the cached copy.
   price appears on the map — the proposed fee is in the panel and the CSV. There is also a **Dealership** data layer colouring
   whole regions by club.
 
-A dealership that holds separated territories is named on each of them — LHE-1
-appears twice, on Lahore Cantt and on Raiwind — while territories that touch are
-named once between them.
+The map labels each territory with its **dealership code only** — `KHI-1`,
+`LHE-2` — since the panel already names everything. A dealership that holds
+separated territories is labelled on each of them: LHE-1 appears twice, on
+Lahore Cantt and on Raiwind, while territories that touch are labelled once
+between them.
 
 Lahore's dealerships follow Karachi's convention of naming the territories they
 cover: **LHE-1 Cantt & Raiwind**, **LHE-2 City & Shalimar**, **LHE-3 Model

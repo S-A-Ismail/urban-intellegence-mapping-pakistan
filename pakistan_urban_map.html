@@ -326,13 +326,15 @@ const LVKIND={crosswalk:"crosswalked from an older layer",
    The commercial grouping, from dealership_clusters.json. An area with no open
    outline is still listed in the panel and simply cannot be drawn. */
 const CLUSTERS=D.clusters||[];
-/* Saturated enough to hold up at the 26% opacity a parent territory is shaded
-   at. Each city's own set is spread as far around the hue wheel as it has
-   members, since only one city's dealerships are ever on screen at once —
-   Karachi reads red / orange / yellow / green, Lahore cyan / violet / mint. */
-const CLUB_COLOR={"KHI-1":"#ff4d3d","KHI-2":"#ff9500","KHI-3":"#ffe83d",
- "KHI-4":"#5ee88a","LHE-1":"#29c5ff","LHE-2":"#b47cff","LHE-3":"#22e39b",
- "MUX-1":"#ff6ad5","PEW-1":"#ff5c8a","ISB-1":"#5b9dff"};
+/* Ten high-chroma hues, assigned so that the dealerships of any one city land
+   far apart on the wheel — only one city is ever on screen at once, so
+   within-city separation is what matters. Karachi reads red / lime / cyan /
+   pink, Lahore orange / green / purple. Warm-family sets were tried first and
+   red-next-to-orange-next-to-yellow is simply hard to tell apart at the 26%
+   opacity a parent territory is shaded at. */
+const CLUB_COLOR={"KHI-1":"#ff453a","KHI-2":"#9ee62c","KHI-3":"#64d2ff",
+ "KHI-4":"#ff5fa8","LHE-1":"#ff9f0a","LHE-2":"#32d74b","LHE-3":"#bf5af2",
+ "MUX-1":"#3d9bff","PEW-1":"#2fd8c0","ISB-1":"#ffd60a"};
 function clustersOf(city){return CLUSTERS.filter(c=>c.city===city);}
 
 /* The polygons that make up a dealership's parent territory — the census
@@ -712,12 +714,14 @@ function draw(recentre){
       g.forEach((f,i)=>{const d=(cs[i][0]-mx2)**2+(cs[i][1]-my2)**2;
         if(d<bd){bd=d;best=f;}});
       const bp=best.properties;
-      const c=CLUSTERS.find(x=>x.code===bp._club);
+      // The map says the code and nothing more — no dealership name, no second
+      // line. The panel carries every name, so repeating them over the shapes
+      // only competes with the map itself.
       if(bp._parent)   // the dealership's own territory
-        return {geo:best, key:gkey, text:bp._club+(c?" "+c.name:""),
+        return {geo:best, key:gkey, text:bp._club,
                 sub:null, club:bp._club, parent:true};
       return {geo:best, key:gkey, text:bp._area,
-              sub:bp._club+(c?" "+c.name:""), club:bp._club};
+              sub:null, club:bp._club};
     });
     labelsAlways=true;
   }else{

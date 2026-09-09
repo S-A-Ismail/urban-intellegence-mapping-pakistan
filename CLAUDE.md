@@ -200,17 +200,21 @@ linear ramp stretch a rounding difference across the whole palette. It fires on
 household size in Lahore (3.2%), Multan (0%) and Islamabad (0%); Karachi's
 tightest layer is 17% so nothing there is affected.
 
-**Club colours** are saturated enough to hold up at the 26% opacity a parent
-territory is shaded at. Only one city's dealerships are ever on screen at once,
-so each city's set is spread as far around the hue wheel as it has members —
-Karachi reads red / orange / yellow / green, Lahore cyan / violet / mint.
+**Club colours** are ten high-chroma hues, assigned so that any one city's
+dealerships land far apart on the wheel — only one city is ever on screen at
+once, so within-city separation is what matters. Karachi reads red / lime /
+cyan / pink, Lahore orange / green / purple. Warm-family sets were tried twice
+and red-beside-orange-beside-yellow is simply hard to separate at the 26%
+opacity a parent territory is shaded at.
 
-**Map labels** are white, bold (700) on a heavy dark halo, sized from `LBL_P`
-(dealership) and `LBL_A` (area); the zoom handler scales each from its own base,
-or zooming flattens the two to one size. The second line is a neutral
-`#e3ebf3` rather than the club colour, because it sits on a premium area painted
-in that very colour and green-on-green was the least legible thing on the map.
-The shape carries the colour; the text does not repeat it.
+**Map labels carry the dealership code and nothing else** — `KHI-1`, `LHE-2`.
+No dealership name, no second line. The panel names everything, so repeating it
+over the shapes only competes with the map. With **Region names** on, the premium
+areas add their own name, again with no second line.
+
+They are white, bold (700) on a heavy dark halo, sized from `LBL_P` (dealership)
+and `LBL_A` (area); the zoom handler scales each from its own base, or zooming
+flattens the two to one size.
 
 **Dealership names** come from `dealership_clusters.json`, which `refresh.py`
 copies over the DealerStructure labels so the cluster card, the structure card
