@@ -157,11 +157,17 @@ top at full opacity with a light outline.
 
 Map labels default to the dealership only — the panel already lists every area —
 and a **Region names** toggle (`S.regionNames`, persisted) adds the area labels.
-A **Premium areas** toggle (`S.mergePremium`, persisted) draws one shape per
-named area instead of every constituent outline: Karachi's 90 outlines become 14.
-The merge combines rings into a single MultiPolygon so `d3.geoPath` renders one
-path and the seams disappear — no geometry library needed — and a merged shape
-carries no stroke, since its internal borders are not real edges.
+A **Premium areas** toggle (`S.mergePremium`, persisted) switches between
+*Highlighted* and *Merged*. Merged means **same colour**: the premium area takes
+the dealership's own shade so the territory reads as one block.
+
+Two details make that work. Painting the premium at the parent's 0.26 opacity is
+not enough — two translucent layers stack to about 0.45 and the pocket still
+shows through as a brighter patch — so a merged premium is drawn at opacity 0
+with `pointer-events:all`, which keeps it hoverable and still able to say which
+place it is. Its constituent outlines are also combined into one MultiPolygon
+(Karachi's 90 become 14) so `d3.geoPath` draws a single path with no seams, and
+it carries no stroke.
 The dealership label is exempt from collision suppression: at most five per city,
 and a territory going unnamed is worse than a small overlap.
 

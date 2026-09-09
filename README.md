@@ -53,10 +53,10 @@ often serve the cached copy.
   with its **premium cluster areas highlighted** on top. By default the map
   labels only the dealership; a **Region names** toggle adds the area names,
   which the side panel lists in full either way. A **Premium areas** toggle
-  switches between the raw outlines and one merged shape per named area —
-  Karachi's 90 outlines become 14, since Clifton alone is nine OSM blocks and
-  Gulistan-e-Johar fifteen. No price appears on the map — the proposed fee is in
-  the panel and the CSV. There is also a **Dealership** data layer colouring
+  switches between *Highlighted*, where the premium areas are picked out on top
+  of the territory, and *Merged*, where they take the dealership's own colour so
+  each territory reads as one shape. Merged areas stay named and hoverable. No
+  price appears on the map — the proposed fee is in the panel and the CSV. There is also a **Dealership** data layer colouring
   whole regions by club.
 
 Select a territory and drop a level and the map **enlarges that territory** —

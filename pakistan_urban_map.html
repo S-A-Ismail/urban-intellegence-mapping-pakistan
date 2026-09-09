@@ -586,7 +586,18 @@ function draw(recentre){
       if(shapesOnly) return (m&&m._enclave)?"#8a6a24":"#1b2837";
       if(v==null||isNaN(v)) return "#16202c";
       return flatMode ? scale((ext[0]+ext[1])/2) : scale(v);})
-    .attr("fill-opacity",f=>f.properties._parent?0.26:1)
+    .attr("fill-opacity",f=>{
+      const q=f.properties;
+      if(q._parent) return 0.26;
+      // Merged: the premium area disappears into the dealership's own shade, so
+      // the territory reads as one colour. Painting it at the parent's opacity
+      // is not enough — two translucent layers stack to about 0.45 and the
+      // pocket still shows through as a brighter patch.
+      if(q._premium && S.mergePremium) return 0;
+      return 1;})
+    // an invisible fill is not hit-tested by default, and merged areas must stay
+    // hoverable so they can still say which place they are
+    .style("pointer-events","all")
     .attr("stroke","none")
     .style("cursor","pointer")
     .on("mousemove",(ev,f)=>{
@@ -779,9 +790,12 @@ function drawLegend(){
       .text(x=>x);
     d3.select("#lnote").html(`<span class="pill p-der">Derived</span> `
       +(clusterView
-        ? `Each dealership's parent territory, shaded, with its premium cluster `
-          +`areas picked out on top. Areas with no open outline are listed in the `
-          +`panel but cannot be drawn.`
+        ? (S.mergePremium
+            ? `Each dealership's territory in one colour, premium areas merged `
+              +`into it. Switch Premium areas to Highlighted to pick them out.`
+            : `Each dealership's parent territory, shaded, with its premium `
+              +`cluster areas picked out on top. Areas with no open outline are `
+              +`listed in the panel but cannot be drawn.`)
         : `Each region coloured by the dealership covering it.`));
     d3.select("#yearflag").html(S.year==="2023"
       ? `<b>2023</b> census — official` : `<b>2026</b> projected — derived`);
@@ -1092,7 +1106,7 @@ function drawControls(){
          try{localStorage.setItem("pum.regionNames",val?"1":"0");}catch(e){}
          draw(false);}));
     const g=d3.select("#c-merge").html("");
-    [["Outlined",false],["Merged",true]].forEach(([lab,val])=>
+    [["Highlighted",false],["Merged",true]].forEach(([lab,val])=>
       g.append("button").attr("class",S.mergePremium===val?"on":"").text(lab)
        .on("click",()=>{S.mergePremium=val;
          try{localStorage.setItem("pum.mergePremium",val?"1":"0");}catch(e){}
@@ -1102,8 +1116,10 @@ function drawControls(){
     const areas=clustersOf(S.city).reduce((t,c)=>
       t+c.areas.filter(a=>a.found.length).length,0);
     d3.select("#mergehint").text(S.mergePremium
-      ? "One shape per named area — "+parts+" outlines drawn as "+areas+"."
-      : parts+" separate outlines make up "+areas+" named areas.");
+      ? "Premium areas take the dealership's own colour, so each territory "
+        +"reads as one shape. Still named and hoverable."
+      : areas+" premium areas picked out of the territory, from "+parts
+        +" outlines.");
   }
 
   const y=d3.select("#c-year").html("");
